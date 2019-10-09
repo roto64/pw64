@@ -42,7 +42,7 @@ Game_Text_Data = {} # Dict of game (Test) names and accompanying mission text
 Game_Test_Data = {} # Dict of the tests/missions available
 
 # PW64 ROM File Name
-PW64_Rom = "Pilotwings 64 (U) [!].z64"
+PW64_Rom = ""
 
 def main():
 	Chunk_Types = ['JPTX', 'NAME', 'INFO', 'COMM', 'FALC',
