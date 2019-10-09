@@ -153,6 +153,8 @@ def main():
 			# Ugh this is a hacky "stop".
 			# If we're past Test_ID's offset + size of FORM, bail out.
 			# Should rewrite this whole section to read in whole FORM and process it properly.
+			#
+			# Comment this out and run with "A_EX_1" as the Test ID to dump ALL the tests.
 			if pw64_rom.tell() >= int(FORM_Length, 16)+int(Game_Test_Data[Test_ID], 16):
 				#print("DONE")
 				#print("*** %s" % hex(pw64_rom.tell()))
