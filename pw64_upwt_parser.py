@@ -274,47 +274,49 @@ def print_adat_decoded(hex_data):
 	# The Font Sprite/Texture maps are in the "STRG" container/blocks.
 	# This table was extrapolated from the FS dump and PJ64 memory searches.
 	char_map_combined = { # // Normal Font //
-												'00': '0', '01': '1', '02': '2', '03': '3', '04': '4',
-												'05': '5', '06': '6', '07': '7', '08': '8', '09': '9',
-												'0A': 'A', '0B': 'B', '0C': 'C', '0D': 'D', '0E': 'E',
-												'0F': 'F', '10': 'G', '11': 'H', '12': 'I', '13': 'J',
-												'14': 'K', '15': 'L', '16': 'M', '17': 'N', '18': 'O',
-												'19': 'P', '1A': 'Q', '1B': 'R', '1C': 'S', '1D': 'T',
-												'1E': 'U', '1F': 'V', '20': 'W', '21': 'X', '22': 'Y',
-												'23': 'Z', '24': 'a', '25': 'b', '26': 'c', '27': 'd',
-												'28': 'e', '29': 'f', '2A': 'g', '2B': 'h', '2C': 'i',
-												'2D': 'j', '2E': 'k', '2F': 'l', '30': 'm', '31': 'n',
-												'32': 'o', '33': 'p', '34': 'q', '35': 'r', '36': 's',
-												'37': 't', '38': 'u', '39': 'v', '3A': 'w', '3B': 'x',
-												'3C': 'y', '3D': 'z', '3E': '-', '3F': '#', '40': '<',
-												'41': '>', '42': ' ', '43': '\"', '44': '(', '45': ')',
-												'46': '*', '47': '&', '48': ',', '49': '.', '4A': '/',
-												'4B': '!', '4C': '?', '4D': '\'', '4E': '#', '4F': ':',
-												'50': '0', '51': '1', '52': '2', '53': '3', '54': '4',
-												'55': '5', '56': '6', '57': '7', '58': '8', '59': '9',
-												'5A': '\\', '5B': '\\', '5C': '\\', '5D': '\\',
-												'5E': '\\', '5F': '\\',
-												# // Bold Font //
-												'60': '0', '61': '1', '62': '2', '63': '3', '64': '4',
-												'65': '5', '66': '6', '67': '7', '68': '8', '69': '9',
-												'6A': 'A', '6B': 'B', '6C': 'C', '6D': 'D', '6E': 'E',
-												'6F': 'F', '70': 'G', '71': 'H', '72': 'I', '73': 'J',
-												'74': 'K', '75': 'L', '76': 'M', '77': 'N', '78': 'O',
-												'79': 'P', '7A': 'Q', '7B': 'R', '7C': 'S', '7D': 'T',
-												'7E': 'U', '7F': 'V', '80': 'W', '81': 'X', '82': 'Y',
-												'83': 'Z', '84': 'a', '85': 'b', '86': 'c', '87': 'd',
-												'88': 'e', '89': 'f', '8A': 'g', '8B': 'h', '8C': 'i',
-												'8D': 'j', '8E': 'k', '8F': 'l', '90': 'm', '91': 'n',
-												'92': 'o', '93': 'p', '94': 'q', '95': 'r', '96': 's',
-												'97': 't', '98': 'u', '99': 'v', '9A': 'w', '9B': 'x',
-												'9C': 'y', '9D': 'z', '9E': '-', '9F': '#', 'A0': '<',
-												'A1': '>', 'A2': ' ', 'A3': '\"', 'A4': '(', 'A5': ')',
-												'A6': '*', 'A7': '&', 'A8': ',', 'A9': '.', 'AA': '/',
-												'AB': '!', 'AC': '?', 'AD': '\'', 'AE': '}', 'AF': ':',
-												'B0': '0', 'B1': '1', 'B2': '2', 'B3': '3', 'B4': '4',
-												'B5': '5', 'B6': '6', 'B7': '7', 'B8': '8', 'B9': '9',
-												'BA': '\\', 'BB': '\\', 'BC': '\\', 'BD': '\\',
-												'BE': '\\', 'BF': '\\' }
+						'00': '0', '01': '1', '02': '2', '03': '3', '04': '4',
+						'05': '5', '06': '6', '07': '7', '08': '8', '09': '9',
+						'0A': 'A', '0B': 'B', '0C': 'C', '0D': 'D', '0E': 'E',
+						'0F': 'F', '10': 'G', '11': 'H', '12': 'I', '13': 'J',
+						'14': 'K', '15': 'L', '16': 'M', '17': 'N', '18': 'O',
+						'19': 'P', '1A': 'Q', '1B': 'R', '1C': 'S', '1D': 'T',
+						'1E': 'U', '1F': 'V', '20': 'W', '21': 'X', '22': 'Y',
+						'23': 'Z', '24': 'a', '25': 'b', '26': 'c', '27': 'd',
+						'28': 'e', '29': 'f', '2A': 'g', '2B': 'h', '2C': 'i',
+						'2D': 'j', '2E': 'k', '2F': 'l', '30': 'm', '31': 'n',
+						'32': 'o', '33': 'p', '34': 'q', '35': 'r', '36': 's',
+						'37': 't', '38': 'u', '39': 'v', '3A': 'w', '3B': 'x',
+						'3C': 'y', '3D': 'z', '3E': '-', '3F': '#', '40': '<',
+						'41': '>', '42': ' ', '43': '\"', '44': '(', '45': ')',
+						'46': '*', '47': '&', '48': ',', '49': '.', '4A': '/',
+						'4B': '!', '4C': '?', '4D': '\'', '4E': '#', '4F': ':',
+						'50': '0', '51': '1', '52': '2', '53': '3', '54': '4',
+						'55': '5', '56': '6', '57': '7', '58': '8', '59': '9',
+						'5A': '\\', '5B': '\\', '5C': '\\', '5D': '\\',
+						'5E': '\\', '5F': '\\',
+						# // Bold Font //
+						# This obviously doesn't show up in this code.
+						# But it is bold in the game. Trust me.
+						'60': '0', '61': '1', '62': '2', '63': '3', '64': '4',
+						'65': '5', '66': '6', '67': '7', '68': '8', '69': '9',
+						'6A': 'A', '6B': 'B', '6C': 'C', '6D': 'D', '6E': 'E',
+						'6F': 'F', '70': 'G', '71': 'H', '72': 'I', '73': 'J',
+						'74': 'K', '75': 'L', '76': 'M', '77': 'N', '78': 'O',
+						'79': 'P', '7A': 'Q', '7B': 'R', '7C': 'S', '7D': 'T',
+						'7E': 'U', '7F': 'V', '80': 'W', '81': 'X', '82': 'Y',
+						'83': 'Z', '84': 'a', '85': 'b', '86': 'c', '87': 'd',
+						'88': 'e', '89': 'f', '8A': 'g', '8B': 'h', '8C': 'i',
+						'8D': 'j', '8E': 'k', '8F': 'l', '90': 'm', '91': 'n',
+						'92': 'o', '93': 'p', '94': 'q', '95': 'r', '96': 's',
+						'97': 't', '98': 'u', '99': 'v', '9A': 'w', '9B': 'x',
+						'9C': 'y', '9D': 'z', '9E': '-', '9F': '#', 'A0': '<',
+						'A1': '>', 'A2': ' ', 'A3': '\"', 'A4': '(', 'A5': ')',
+						'A6': '*', 'A7': '&', 'A8': ',', 'A9': '.', 'AA': '/',
+						'AB': '!', 'AC': '?', 'AD': '\'', 'AE': '}', 'AF': ':',
+						'B0': '0', 'B1': '1', 'B2': '2', 'B3': '3', 'B4': '4',
+						'B5': '5', 'B6': '6', 'B7': '7', 'B8': '8', 'B9': '9',
+						'BA': '\\', 'BB': '\\', 'BC': '\\', 'BD': '\\',
+						'BE': '\\', 'BF': '\\' }
 
 
 	hex_split = [(hex_data[i:i+2]) for i in range(0, len(hex_data), 2)]
@@ -492,6 +494,19 @@ def COMM_parser(COMM_Data, length):
 	
 	COMM_Data_Start = COMM_Data.tell()
 
+	### Debug
+	# Read in and dump whole COMM
+	UPWT_COMM_data = binascii.b2a_hex(COMM_Data.read(int(length, 16)))
+	print("\t\tData: ")
+	print("\t\t\tArray Index | Data")
+	array_index = 0
+	for bla in ["".join(x) for x in list(grouper(UPWT_COMM_data, 8, '?'))]:
+		print("\t\t\t    (%s)       %s" % (array_index, bla))
+		array_index += 1
+	# Go back to start of COMM
+	COMM_Data.seek(COMM_Data_Start, 0)# + int(length, 16), 0)
+	###
+
 	# The following is right at the start of COMM data (after length, duh):
 	COMM_Class = binascii.b2a_hex(COMM_Data.read(1))
 	COMM_Vehicle = binascii.b2a_hex(COMM_Data.read(1))
@@ -501,9 +516,17 @@ def COMM_parser(COMM_Data, length):
 	# Move 0x4 bytes forward for "time of day/weather" data
 	COMM_Data.seek(4, 1)
 	COMM_Skybox = binascii.b2a_hex(COMM_Data.read(1))
-	
-	# Go to end of ("COMM data" - 0x1D) to get TPAD/LPAD/Rings/Balloons/Targets/etc counts
-	COMM_Data.seek(int(int(length, 16) - 0x1D),1)
+	COMM_Snow = binascii.b2a_hex(COMM_Data.read(1)) # Only visible on real HW or in Emu with S/W rendering.
+
+	# Move 0x6 bytes foward for Wind data
+	# 4X == Positive, CX == Negative (West/East, South/North, Up/Down)
+	COMM_Data.seek(6, 1)
+	COMM_WestEast_Wind = round(struct.unpack('>f', COMM_Data.read(4))[0],6) #binascii.b2a_hex(COMM_Data.read(4)) # +West, -East
+	COMM_SouthNorth_Wind = round(struct.unpack('>f', COMM_Data.read(4))[0],6) # +South, -North
+	COMM_UpDown = round(struct.unpack('>f', COMM_Data.read(4))[0],6) # Y-axis lift
+
+	# Go to end of ("COMM data" - 0x30) to get TPAD/LPAD/Rings/Balloons/Targets/etc counts
+	COMM_Data.seek(int(int(length, 16) - 0x30),1) # Relative to previously read bytes above!
 	COMM_Object_Thermals = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
 	COMM_Object_LocalWinds = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
 	COMM_Object_TPADs = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # Takeoff "Pad" (also for Gyro)
@@ -523,17 +546,34 @@ def COMM_parser(COMM_Data, length):
 	# Thanks to 'pfedak' for initial findings on these dicts
 	classes = {'00': 'Beginner', '01': 'Class A', '02': 'Class B', '03': 'Pilot Class'}
 	vehicles = {'00': 'Hang Glider', '01': 'Rocket Pack', '02': 'Gyro Copter', '03': 'Cannon Ball', '04': 'Sky Diver', '05': 'Jumble Hopper', '06': 'Birdman'}
+	# Test, 00 = 1, 01 = 2
 	levels = {'00': 'Holiday Island', '01': 'Crescent Island', '02': 'Little States', '03': 'Ever-Frost Island'}
-	skybox = {'00': 'Sunny', '01': 'Sunny Part 2', '02': 'Cloudy', '03': 'Snowing?', '04': 'Evening', '05': 'Starry Night'}
-	#                                                               ^- wrong, A_BD_3 has 0x0201 for "Snowing"
-
-
-	print("\n\tMission / Test Details:")
+	skybox = {'00': 'Sunny', '01': 'Sunny Part 2', '02': 'Cloudy', '03': '???', '04': 'Evening', '05': 'Starry Night'}
+                                                                      #^-- P_RP_2, very cloudy?
+	print("\t-------")
+	print("\tMission / Test Details:")
 	print("\t\tClass: %s (%s)" % (classes[COMM_Class], COMM_Class))
 	print("\t\tVehicle: %s (%s)" % (vehicles[COMM_Vehicle], COMM_Vehicle))
 	print("\t\tTest Number: %s (%s)" % (int(COMM_Test_Number, 16)+1, COMM_Test_Number))
 	print("\t\tLevel: %s (%s)" % (levels[COMM_Level], COMM_Level))
 	print("\t\tWeather / Time: %s (%s)" % (skybox[COMM_Skybox], COMM_Skybox))
+	if COMM_Snow == '01':
+		print("\t\t\tSnowing: Yes (%s)" % (COMM_Snow))
+	#---
+	# If 0 ; show nothing
+	if COMM_WestEast_Wind < 0:
+		print("\t\tWind Force East: %s" % COMM_WestEast_Wind)
+	elif COMM_WestEast_Wind > 0:
+		print("\t\tWind Force West: %s" % COMM_WestEast_Wind)
+	if COMM_SouthNorth_Wind < 0:
+		print("\t\tWind Force North: %s" % COMM_SouthNorth_Wind)
+	elif COMM_SouthNorth_Wind > 0:
+		print("\t\tWind Force South: %s" % COMM_SouthNorth_Wind)
+	if COMM_UpDown < 0:
+		print("\t\tWind Force Down: %s" % COMM_UpDown)
+	elif COMM_UpDown > 0:
+		print("\t\tWind Force Up: %s" % COMM_UpDown)
+	#---
 	print("\t-------")
 	print("\tMission Parameters:")
 	print("\t\tHang Glider Thermals: %s" % COMM_Object_Thermals)
@@ -789,6 +829,8 @@ def RNGS_parser(RNGS_data, length):
 		RNGS_yaw = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[3]))
 		RNGS_pitch = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[4]))
 		RNGS_roll = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[5]))
+		RNGS_size_state = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[21]))
+		RNGS_spin_speed = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[25]))
 		RNGS_type = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[28]))
 
 		# Round FP precision to 6 digits		
@@ -809,7 +851,18 @@ def RNGS_parser(RNGS_data, length):
 
 		### ToDo: More ring parsing:
 		# B_RP_2, 2nd ring is timer, 3rd ring spins on X- axis really fast?
+		# Index [13, 14] has something to do with Timed rings?:
+		#  "rings: Untimed ring index %d in ring %d's timechild list"
 		# Add ring rotation "speed" at 0x8036DC0C, try 00/40
+
+		ring_ss = list(grouper(binascii.b2a_hex(RNGS_size_state), 2, '?'))
+		ring_size = ''.join(ring_ss[0])
+		ring_state = ''.join(ring_ss[1])
+		print("\t\t\tRing Size (01-04): %s" % ring_size) # 00/05 are invalid: "bad ring size"
+		if ring_state == "00":
+			print("\t\t\tRing State: Inactive (Closed)")
+		elif ring_state == "01":
+			print("\t\t\tRing State: Active (Open)")
 
 		ring_type = list(grouper(binascii.b2a_hex(RNGS_type), 2, '?'))
 		print("\t\t\tRing Details:\n\t\t\t\tRaw: %s" % binascii.b2a_hex(RNGS_type))
@@ -819,26 +872,29 @@ def RNGS_parser(RNGS_data, length):
 		ring_special = ''.join(ring_type[2])
 		ring_unknown2 = ''.join(ring_type[3])
 		
+		# Hex:   78 79 7a 6e
+		# ASCII: x  y  z  n
+		# (thanks pfedak)
 		if ring_rotation == "78":
-			print("\t\t\t\tRotation: %s (Y-Axis)" % ring_rotation)
-		elif ring_rotation == "79":
-			print("\t\t\t\tRotation: %s (None)" % ring_rotation)
-		elif ring_rotation == "7a":
 			print("\t\t\t\tRotation: %s (X-Axis)" % ring_rotation)
+		elif ring_rotation == "79":
+			print("\t\t\t\tRotation: %s (Y-Axis)" % ring_rotation)
+		elif ring_rotation == "7a":
+			print("\t\t\t\tRotation: %s (Z-Axis)" % ring_rotation)
 		elif ring_rotation == "6e":
-			print("\t\t\t\tRotation: %s (None? Still?)" % ring_rotation) # P_RP_1
-			
+			print("\t\t\t\tRotation: %s (None)" % ring_rotation) # P_RP_1
 		print("\t\t\t\tUnknown1: %s" % ring_unknown1)
 
 		if ring_special == "01":
 			print("\t\t\t\tSpecial: %s (Bonus ring)" % ring_special)
 		elif ring_special == "02":
-			print("\t\t\t\tSpecial: %s ('Hidden' ring?)" % ring_special)
+			print("\t\t\t\tSpecial: %s ('Hidden' ring)" % ring_special) # You just have to be near it to trigger.
 		elif ring_special == "03":
 			print("\t\t\t\tSpecial: %s (Multicolored 'GOAL' ring)" % ring_special) # P_RP_1
 		else:
-			print("\t\t\t\tSpecial: %s (Unknown)" % ring_special)
+			print("\t\t\t\tSpecial: %s (Normal)" % ring_special)
 		print("\t\t\t\tUnknown2: %s" % ring_unknown2)
+		print("\t\t\t\tRotation Speed: %s" % round(struct.unpack('>f', RNGS_spin_speed)[0],6))
 		
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_RNGS_Coordinates_Floats[0],
 															UPWT_RNGS_Coordinates_Floats[2],
