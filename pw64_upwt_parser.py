@@ -830,6 +830,9 @@ def RNGS_parser(RNGS_data, length):
 		RNGS_pitch = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[4]))
 		RNGS_roll = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[5]))
 		RNGS_size_state = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[21]))
+		RNGS_motion_rad_start = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[22]))
+		RNGS_motion_rad_end = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[23]))
+		RNGS_motion_axis = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[24]))
 		RNGS_spin_speed = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[25]))
 		RNGS_type = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[28]))
 
@@ -865,7 +868,7 @@ def RNGS_parser(RNGS_data, length):
 			print("\t\t\tRing State: Active (Open)")
 
 		ring_type = list(grouper(binascii.b2a_hex(RNGS_type), 2, '?'))
-		print("\t\t\tRing Details:\n\t\t\t\tRaw: %s" % binascii.b2a_hex(RNGS_type))
+		print("\t\t\tRing Details:")
 
 		ring_rotation = ''.join(ring_type[0])
 		ring_unknown1 = ''.join(ring_type[1])
@@ -875,6 +878,22 @@ def RNGS_parser(RNGS_data, length):
 		# Hex:   78 79 7a 6e
 		# ASCII: x  y  z  n
 		# (thanks pfedak)
+		#
+		# Motion around axis as seen in B_RP_2 (Ring #10)
+		ring_motion_axis = ''.join(list(grouper(binascii.b2a_hex(RNGS_motion_axis), 2, '?'))[0])
+		if ring_motion_axis == "78":
+			print("\t\t\t\tMotion: %s (X-Axis)" % ring_motion_axis)
+		elif ring_motion_axis == "79":
+			print("\t\t\t\tMotion: %s (Y-Axis)" % ring_motion_axis)
+		elif ring_motion_axis == "7a":
+			print("\t\t\t\tMotion: %s (Z-Axis)" % ring_motion_axis)
+		elif ring_motion_axis == "6e":
+			print("\t\t\t\tMotion: %s (None)" % ring_motion_axis)
+		if ring_motion_axis != "6e":
+			print("\t\t\t\t\tMotion Rad Start: %s" % round(struct.unpack('>f', RNGS_motion_rad_start)[0],6))
+			print("\t\t\t\t\tMotion Rad End: %s" % round(struct.unpack('>f', RNGS_motion_rad_end)[0],6))
+
+		# Rotation of ring
 		if ring_rotation == "78":
 			print("\t\t\t\tRotation: %s (X-Axis)" % ring_rotation)
 		elif ring_rotation == "79":
@@ -883,6 +902,9 @@ def RNGS_parser(RNGS_data, length):
 			print("\t\t\t\tRotation: %s (Z-Axis)" % ring_rotation)
 		elif ring_rotation == "6e":
 			print("\t\t\t\tRotation: %s (None)" % ring_rotation) # P_RP_1
+		if ring_rotation != "6e":
+			print("\t\t\t\t\tRotation Speed: %s" % round(struct.unpack('>f', RNGS_spin_speed)[0],6))
+
 		print("\t\t\t\tUnknown1: %s" % ring_unknown1)
 
 		if ring_special == "01":
@@ -894,8 +916,8 @@ def RNGS_parser(RNGS_data, length):
 		else:
 			print("\t\t\t\tSpecial: %s (Normal)" % ring_special)
 		print("\t\t\t\tUnknown2: %s" % ring_unknown2)
-		print("\t\t\t\tRotation Speed: %s" % round(struct.unpack('>f', RNGS_spin_speed)[0],6))
 		
+
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_RNGS_Coordinates_Floats[0],
 															UPWT_RNGS_Coordinates_Floats[2],
 															UPWT_RNGS_Coordinates_Floats[1],
