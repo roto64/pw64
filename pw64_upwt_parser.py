@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# UPWT Parser v0.03 by roto
+# UPWT Parser v0.04 by roto
 #
 # UPWT blocks are the Missions or "Tests" throughout the game. This parser attempts to explain
 # all the sections in the UPWT chunks and what they do to set up a test.
@@ -12,8 +12,7 @@
 #
 
 # 1) Add the filename of your ROM in the PW64_Rom var (only supports US at the moment)
-# 2) Run as: ./pw64_upwt.py <TEST_ID>
-
+# 2) Run as: ./pw64_upwt_parser.py <TEST_ID> (or without Test ID to see a list of them)
 
 # Needs more research as data doesn't make sense: CNTG / FALC / HOPD / HPAD / LWND / PHTS
 
@@ -169,15 +168,20 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return itertools.izip_longest(fillvalue=fillvalue, *args)
 
+def dsplit(data, convert=False):
+	# Doubleword Split with base 16 conversion if needed
+	if convert == True:
+		return int(data[0:2],16), int(data[2:4],16), int(data[4:6],16), int(data[6:8],16)
+	else:
+		return data[0:2], data[2:4], data[4:6], data[6:8]
+
 def mission_index_builder():
 	# Seeks out each UPWT chunk in the ROM and builds a dict with TestID->Offsets
 
 	global Game_Test_Data
 
-	# Open the ROM and find the first UPWT chunk @ 0x342E2C. Bad hardcoding.
+	# Open the ROM and find the first UPWT chunk @ 0x342E2C. Bad hardcoding. Maybe use TABL?
 	with open(PW64_Rom, 'rb') as pw64_rom:
-	
-		#UPWT_Section_Length
 		pw64_rom.seek(int(0x342E2C), 0)
 
 		# Read in all the UPWT chunks
@@ -412,7 +416,7 @@ def BALS_parser(BALS_Data, lenght):
 
 		# Can't be popped
 		if BALS_solidity == '43fa0000':
-			print("\t\tBall / Balloon Can Pop: NO")
+			print("\t\tBall / Balloon Can Pop: NO") # B_RP_3
 		else:
 			print("\t\tBall / Balloon Can Pop: YES")
 
@@ -491,57 +495,55 @@ def COMM_parser(COMM_Data, length):
 	global COMM_Object_Unknown
 	global COMM_Object_Cannon_Targets
 	global COMM_Object_HM_Goals
-	
-	COMM_Data_Start = COMM_Data.tell()
+
+	# Array/List that will hold COMM data in 4 "hex-byte" chunks
+	COMM_DW_List = []
 
 	### Debug
-	# Read in and dump whole COMM
+	# Read in and dump whole COMM into a list 4-bytes at a time
 	UPWT_COMM_data = binascii.b2a_hex(COMM_Data.read(int(length, 16)))
 	print("\t\tData: ")
 	print("\t\t\tArray Index | Data")
 	array_index = 0
 	for bla in ["".join(x) for x in list(grouper(UPWT_COMM_data, 8, '?'))]:
 		print("\t\t\t    (%s)       %s" % (array_index, bla))
+		COMM_DW_List.append(bla)
 		array_index += 1
-	# Go back to start of COMM
-	COMM_Data.seek(COMM_Data_Start, 0)# + int(length, 16), 0)
-	###
 
-	# The following is right at the start of COMM data (after length, duh):
-	COMM_Class = binascii.b2a_hex(COMM_Data.read(1))
-	COMM_Vehicle = binascii.b2a_hex(COMM_Data.read(1))
-	COMM_Test_Number = binascii.b2a_hex(COMM_Data.read(1))
-	COMM_Level = binascii.b2a_hex(COMM_Data.read(1))
-	
-	# Move 0x4 bytes forward for "time of day/weather" data
-	COMM_Data.seek(4, 1)
-	COMM_Skybox = binascii.b2a_hex(COMM_Data.read(1))
-	COMM_Snow = binascii.b2a_hex(COMM_Data.read(1)) # Only visible on real HW or in Emu with S/W rendering.
+	# These 4 values are from the first doubleword (4-bytes) in the COMM array/list
+	COMM_Class = dsplit(COMM_DW_List[0])[0]
+	COMM_Vehicle = dsplit(COMM_DW_List[0])[1]
+	COMM_Test_Number = dsplit(COMM_DW_List[0])[2]
+	COMM_Level = dsplit(COMM_DW_List[0])[3]
 
-	# Move 0x6 bytes foward for Wind data
+	COMM_Skybox = dsplit(COMM_DW_List[2])[0]
+	COMM_Snow = dsplit(COMM_DW_List[2])[1] # Only visible on real HW or in Emu with S/W rendering.
+
+	# Constant Level Wind Data
 	# 4X == Positive, CX == Negative (West/East, South/North, Up/Down)
-	COMM_Data.seek(6, 1)
-	COMM_WestEast_Wind = round(struct.unpack('>f', COMM_Data.read(4))[0],6) #binascii.b2a_hex(COMM_Data.read(4)) # +West, -East
-	COMM_SouthNorth_Wind = round(struct.unpack('>f', COMM_Data.read(4))[0],6) # +South, -North
-	COMM_UpDown = round(struct.unpack('>f', COMM_Data.read(4))[0],6) # Y-axis lift
+	COMM_WestEast_Wind = round(struct.unpack('>f', COMM_DW_List[4].decode('hex'))[0],6) # +West, -East
+	COMM_SouthNorth_Wind = round(struct.unpack('>f', COMM_DW_List[5].decode('hex'))[0],6) # +South, -North
+	COMM_UpDown = round(struct.unpack('>f', COMM_DW_List[6].decode('hex'))[0],6) # Y-axis lift
 
-	# Go to end of ("COMM data" - 0x30) to get TPAD/LPAD/Rings/Balloons/Targets/etc counts
-	COMM_Data.seek(int(int(length, 16) - 0x30),1) # Relative to previously read bytes above!
-	COMM_Object_Thermals = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_LocalWinds = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_TPADs = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # Takeoff "Pad" (also for Gyro)
-	COMM_Object_LPADs = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # RP Landing Pad
-	COMM_Object_LSTPs = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # Gyro Landing Strip
-	COMM_Object_Rings = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_Balloons = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_Rocket_Targets = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_Floating_Pads = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_Ball_Target = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # BTGT (Ball Target/Destination?)
-	COMM_Object_Photo_Target = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_Falcos = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # "Falcos Domains" from debug_printf
-	COMM_Object_Unknown = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # Unknown
-	COMM_Object_Cannon_Targets = int(binascii.b2a_hex(COMM_Data.read(1)), 16)
-	COMM_Object_HM_Goals = int(binascii.b2a_hex(COMM_Data.read(1)), 16) # Jumble Hopper destination
+	# Counts of Objects / Targets / etc
+	COMM_Object_Thermals = dsplit(COMM_DW_List[263], True)[0]
+	COMM_Object_LocalWinds = dsplit(COMM_DW_List[263], True)[1]
+	COMM_Object_TPADs = dsplit(COMM_DW_List[263], True)[2] # Takeoff "Pad" coordinates (not always on ground, e.g. HG)
+	COMM_Object_LPADs = dsplit(COMM_DW_List[263], True)[3] # HG/RP/SD Landing Pad
+
+	COMM_Object_LSTPs = dsplit(COMM_DW_List[264], True)[0] # Gyro Landing Strip
+	COMM_Object_Rings = dsplit(COMM_DW_List[264], True)[1]
+	COMM_Object_Balloons = dsplit(COMM_DW_List[264], True)[2]
+	COMM_Object_Rocket_Targets = dsplit(COMM_DW_List[264], True)[3]
+
+	COMM_Object_Floating_Pads = dsplit(COMM_DW_List[265], True)[0]
+	COMM_Object_Ball_Target = dsplit(COMM_DW_List[265], True)[1] # BTGT (Ball Target/Destination cylinder marker)
+	COMM_Object_Photo_Target = dsplit(COMM_DW_List[265], True)[2]
+	COMM_Object_Falcos = dsplit(COMM_DW_List[265], True)[3] # "Falcos Domains" from debug_printf
+
+	COMM_Object_Unknown = dsplit(COMM_DW_List[266], True)[0] # Nothing in Debug output upon changing this value.
+	COMM_Object_Cannon_Targets = dsplit(COMM_DW_List[266], True)[1]
+	COMM_Object_HM_Goals = dsplit(COMM_DW_List[266], True)[2] # Jumble Hopper destination
 
 	# Thanks to 'pfedak' for initial findings on these dicts
 	classes = {'00': 'Beginner', '01': 'Class A', '02': 'Class B', '03': 'Pilot Class'}
