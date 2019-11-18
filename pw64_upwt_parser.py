@@ -16,6 +16,10 @@
 
 # Needs more research as data doesn't make sense: CNTG / FALC / HOPD / HPAD / LWND / PHTS
 
+# ToDo:
+# TABL decode (instead of scanning file location/size)
+# More Verbose Array Data dump descriptions (like in COMM/BALS) for each chunk type (for vimdiff)
+
 import binascii
 import itertools
 import struct
@@ -395,12 +399,28 @@ def BALS_parser(BALS_Data, lenght):
 										round(struct.unpack('>f', BALS_y)[0],6),
 										round(struct.unpack('>f', BALS_scale)[0],6)]
 
+		# Array Index to description "map"
+		array_index_map = { 0: "X",
+							1: "Z",
+							2: "Y",
+							9: "Solid or Poppable",
+							10: "Weight",
+							11: "Force needed to Pop Balloon",
+							12: "Scale (Size)",
+							32: "Color",
+							33: "Type (Single or Splits into multiple balloons)"}
+
 		print("\n\t\tBall # %s:" % counter)
 		print("\t\tBall Data: ")
-		print("\t\t\tArray Index | Data")
+		print("\t\t\tArray Index | Data         | Data Description")
+		print("\t\t\t---------------------------------------------")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(ball, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(ball, 8, '?'))]:
+			if array_index in array_index_map:
+				data_chunk_type = array_index_map[array_index]
+			else:
+				data_chunk_type = ""
+			print("\t\t\t    (%s)       %s       %s" % (array_index, byte_group, data_chunk_type))
 			array_index += 1
 
 		if BALS_color == '00':
@@ -419,7 +439,7 @@ def BALS_parser(BALS_Data, lenght):
 			print("\t\tBall / Balloon Can Pop: NO") # B_RP_3
 		else:
 			print("\t\tBall / Balloon Can Pop: YES")
-
+		# /\ --- \/ wait wat? Double check these two...
 		# This is a weird one, you need some speed to pop this balloon (check B_RP_1)
 		if BALS_popforce == '43fa0000':
 			print("\t\tBall Pop Requires Speed/Force (%s ?)" % round(struct.unpack('>f', bytearray.fromhex(BALS_popforce))[0],6))
@@ -442,8 +462,8 @@ def BTGT_HOPD_parser(BTGT_HOPD_data, length):
 	print("\t\tData: ")
 	print("\t\t\tArray Index | Data")
 	array_index = 0
-	for bla in ["".join(x) for x in list(grouper(UPWT_BH_data, 8, '?'))]:
-		print("\t\t\t    (%s)       %s" % (array_index, bla))
+	for byte_group in ["".join(x) for x in list(grouper(UPWT_BH_data, 8, '?'))]:
+		print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 		array_index += 1
 			
 	BTGT_HOPD_data.seek(BTGT_HOPD_Data_Start, 0) # Go back to start
@@ -499,15 +519,32 @@ def COMM_parser(COMM_Data, length):
 	# Array/List that will hold COMM data in 4 "hex-byte" chunks
 	COMM_DW_List = []
 
+
+	# Array Index to description "map"
+	array_index_map = { 0: "Pilot Class / Vehicle / Test Number / Level",
+						2: "Weather (Time of Day) / Snow",
+						4: "West/East Wind",
+						5: "South/North Wind",
+						6: "Up/Down Wind",
+						263: "THER / LWND / TPAD / LPAD",
+						264: "LSTP / RNGS / BALS / TARG",
+						265: "HPAD / BTGT / PHTS / FALC",
+						266: "UNKNOWN / CNTG / HOPD"}
+
 	### Debug
 	# Read in and dump whole COMM into a list 4-bytes at a time
 	UPWT_COMM_data = binascii.b2a_hex(COMM_Data.read(int(length, 16)))
 	print("\t\tData: ")
-	print("\t\t\tArray Index | Data")
+	print("\t\t\tArray Index | Data         | Data Description")
+	print("\t\t\t---------------------------------------------")
 	array_index = 0
-	for bla in ["".join(x) for x in list(grouper(UPWT_COMM_data, 8, '?'))]:
-		print("\t\t\t    (%s)       %s" % (array_index, bla))
-		COMM_DW_List.append(bla)
+	for byte_group in ["".join(x) for x in list(grouper(UPWT_COMM_data, 8, '?'))]:
+		if array_index in array_index_map:
+			data_chunk_type = array_index_map[array_index]
+		else:
+			data_chunk_type = ""
+		print("\t\t\t    (%s)       %s       %s" % (array_index, byte_group, data_chunk_type))
+		COMM_DW_List.append(byte_group)
 		array_index += 1
 
 	# These 4 values are from the first doubleword (4-bytes) in the COMM array/list
@@ -662,8 +699,8 @@ def HPAD_parser(HPAD_data, length):
 		print("\t\tHPAD Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(HPAD, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(HPAD, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 				
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_HPAD_Coordinates_Floats[0],
@@ -705,8 +742,8 @@ def FALC_parser(FALC_data, length):
 		print("\t\tFALC Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(FALC, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(FALC, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 				
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_FALC_Coordinates_Floats[0],
@@ -768,8 +805,8 @@ def LWIN_parser(LWIN_data, length):
 		print("\t\tLocal Wind Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(wind, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(wind, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 
 def JPTX_parser(JPTX_data, length):
@@ -805,8 +842,8 @@ def PHTS_parser(PHTS_data, length):
 		print("\t\tPhoto # %s:" % counter)
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(photo, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(photo, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 
 def RNGS_parser(RNGS_data, length):
@@ -850,8 +887,8 @@ def RNGS_parser(RNGS_data, length):
 		print("\t\tRing Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(ring, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(ring, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 
 		### ToDo: More ring parsing:
@@ -959,8 +996,8 @@ def TARG_parser(TARG_data, length):
 		print("\t\tTARG Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(TARG, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(TARG, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 				
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_TARG_Coordinates_Floats[0],
@@ -1002,8 +1039,8 @@ def THER_parser(THER_data, length):
 		print("\t\tTHER Data: ")
 		print("\t\t\tArray Index | Data")
 		array_index = 0
-		for bla in ["".join(x) for x in list(grouper(THER, 8, '?'))]:
-			print("\t\t\t    (%s)       %s" % (array_index, bla))
+		for byte_group in ["".join(x) for x in list(grouper(THER, 8, '?'))]:
+			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
 				
 		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\t\n\t\t\tWidth: %s\n\t\t\tHeight: %s\n" % (UPWT_THER_Coordinates_Floats[0],
