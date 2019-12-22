@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # UPWT Parser v0.04 by roto
 #
@@ -17,7 +17,10 @@
 # Needs more research as data doesn't make sense: CNTG / FALC / HOPD / HPAD / LWND / PHTS
 
 # ToDo:
-# TABL decode (instead of scanning file location/size)
+# Add JSON output/dump
+# ArgParse for flags (such as JSON output above)
+
+# ToDo Later:
 # More Verbose Array Data dump descriptions (like in COMM/BALS) for each chunk type (for vimdiff)
 
 import binascii
@@ -44,6 +47,13 @@ COMM_Object_HM_Goals = 0
 Game_Text_Data = {} # Dict of game (Test) names and accompanying mission text
 Game_Test_Data = {} # Dict of the tests/missions available
 
+# Will hold our table of files: File Type, File Offset, and File Size
+fs_table = {}
+# Shortcuts for the above dict
+FS_FILE_TYPE = 0
+FS_FILE_OFFSET = 1
+fs_file_size = 2
+
 # PW64 ROM File Name
 PW64_Rom = ""
 
@@ -53,14 +63,18 @@ def main():
 				   'RNGS', 'LSTP', 'TARG', 'PAD ', 'HPAD',
 				   'PHTS', 'LWIN', 'BTGT', 'CNTG']
 
-        if PW64_Rom == '':
+	if PW64_Rom == '':
 		print("Update the 'PW64_Rom' variable and run me again!")
 		sys.exit(1)
 	
+	# Unpack and decode the FS
+	global fs_table
+	fs_table = unpack_full_tabl()
+
 	# Read the ADAT chunk from the ROM and store in a global dict
 	game_text_builder()
 
-	# Build the list of available Test IDs
+	# Build the list of available Test IDs and populate "Game_Test_Data"
 	tests_list = mission_index_builder()
 	
 	# Did we get a Test ID?
@@ -80,15 +94,14 @@ def main():
 	# Since it now reads the ROM it doesn't work correctly...
 	# e.g. if it reads an "unknown" chunk (change HPAD to HPOD) it just skips it.
 	with open(PW64_Rom, 'rb') as pw64_rom:
-		# Find the test ID in the dict and go to the offset of the provided Test ID
+		# Find the test ID in the dict, go to the offset of the provided Test ID and start parsing it
 		pw64_rom.seek(int(Game_Test_Data[Test_ID], 16))
 		#print("*** %s" % hex(pw64_rom.tell()))
 		while True:
-			Marker = pw64_rom.read(4)
-
+			Marker = pw64_rom.read(4).decode()
 			if Marker == "FORM":
 				# This is special because we don't want to read in the entire block.
-				Marker_Length = binascii.b2a_hex(pw64_rom.read(4))
+				Marker_Length = pw64_rom.read(4).hex()
 				Marker_Data_Start = pw64_rom.tell()
 				FORM_Length = Marker_Length
 			elif Marker == "UPWT": # No Length. Data Descriptor: "Ultra Pilot Wings Test"
@@ -98,7 +111,7 @@ def main():
 				print("Soon...")
 				sys.exit(1)
 			elif Marker in Chunk_Types:
-				Marker_Length = binascii.b2a_hex(pw64_rom.read(4))
+				Marker_Length = pw64_rom.read(4).hex()
 				Marker_Data_Start = pw64_rom.tell()
 			else:
 				if int(hex(pw64_rom.tell()), 16) >= int(FORM_Length, 16):
@@ -119,7 +132,7 @@ def main():
 			if Marker == "NAME" or Marker == "INFO":
 				# Usually ASCII that doesn't need parsing
 				Marker_Data = pw64_rom.read(int(Marker_Length, 16))
-				print("\t\tData: %s" % Marker_Data)
+				print("\t\tData: %s" % Marker_Data.decode())
 			elif Marker == "BALS":
 				BALS_parser(pw64_rom, Marker_Length)
 			elif Marker == "BTGT" or Marker == "HOPD":
@@ -170,7 +183,7 @@ def main():
 def grouper(iterable, n, fillvalue=None):
 	# For grouping n number of characters together for display
     args = [iter(iterable)] * n
-    return itertools.izip_longest(fillvalue=fillvalue, *args)
+    return itertools.zip_longest(fillvalue=fillvalue, *args)
 
 def dsplit(data, convert=False):
 	# Doubleword Split with base 16 conversion if needed
@@ -181,68 +194,69 @@ def dsplit(data, convert=False):
 
 def mission_index_builder():
 	# Seeks out each UPWT chunk in the ROM and builds a dict with TestID->Offsets
+	# This function is probably reduntant because of unpack_full_tabl() since it was previously only meant for UPWT.
+	# Maybe redo that other function to find UPWT's instead of here.
 
 	global Game_Test_Data
+	global fs_table
 
-	# Open the ROM and find the first UPWT chunk @ 0x342E2C. Bad hardcoding. Maybe use TABL?
+	task_list = [] # Build a list of Test ID's for user consumption and populate list to be returned by this func
+
+	# Open the ROM and find the first UPWT chunk (since they are grouped in the FS, this is safe-ish)
 	with open(PW64_Rom, 'rb') as pw64_rom:
-		pw64_rom.seek(int(0x342E2C), 0)
+		# Find our first instance of the file type. Files are grouped together. This is fine. Probably.
+		pw_file_type = "UPWT"
+		for file_index in fs_table:
+			if fs_table[file_index][FS_FILE_TYPE] == pw_file_type:
+				file_first_hit = int(fs_table[file_index][FS_FILE_OFFSET], 16)
+				break
 
-		# Read in all the UPWT chunks
-		while True:
-			UPWT_Data_Start = pw64_rom.tell()
-			
-			FORM_block_marker = pw64_rom.read(4)
-			FORM_block_length = binascii.b2a_hex(pw64_rom.read(4))
+		# This is an unnecessary ROM read. Only pulls mission ID for UPWT. But for all other files reads junk into "task_ID".
+		with open(PW64_Rom, 'rb') as pw64_rom:
+			location = file_first_hit
+			for fs_index in range(len(fs_table)):
+				file_type = fs_table[fs_index][FS_FILE_TYPE]
+				if  file_type == pw_file_type:
+					file_size = fs_table[fs_index][fs_file_size]
 
-			UPWT_Chunk_Marker = pw64_rom.read(4)
-			
-			if UPWT_Chunk_Marker == "UPWT":			
-				PAD_Chunk_Marker = pw64_rom.read(4)
-				PAD_Chunk_Length = binascii.b2a_hex(pw64_rom.read(4))
-				
-				# Read 'PAD ' and do nothing
-				pw64_rom.read(int(PAD_Chunk_Length, 16))
+					# This is the only reason we read the ROM yet again...
+					if file_type == "UPWT":
+						pw64_rom.seek(location + 0x20, 0) # Skip 0x20 bytes to go straight to the test/task name/ID
+						task_ID = pw64_rom.read(6).decode()
+					else:
+						task_ID = "" # We don't _really_ needs this since we never read out the Task ID for non-UPWT.
 
-				JPTX_chunk_marker = pw64_rom.read(4)
-				JPTX_chunk_length = binascii.b2a_hex(pw64_rom.read(4))
-
-				if JPTX_chunk_marker == "JPTX":
-					test_id = pw64_rom.read(int(JPTX_chunk_length, 16)).rstrip('\0')
-					
 					# The Canon missions have identical ID's for 4 tests each...
 					# e.g. A_EX_[1-3]
 					# Need a better solution here. Nested dicts? 
-					if test_id in Game_Test_Data:
-						# For now, ppend the offset to the ID if it "already exists" (dupe)
-						test_id = test_id + '-' + hex(UPWT_Data_Start)
-					# Update our global dict
-					Game_Test_Data.update( { test_id: hex(UPWT_Data_Start) })
+					if task_ID in Game_Test_Data:
+							# For now, append the offset to the ID if it "already exists" (dupe)
+							task_ID = task_ID + '-' + hex(location)
 
-				# Go back to start of this FORM+FORM_LENGTH for next chunk
-				pw64_rom.seek(UPWT_Data_Start + int(FORM_block_length, 16) - 4, 0)
-			
-			# No more UPWT's
-			elif UPWT_Chunk_Marker == "ADAT":
-				break
+					Game_Test_Data.update({ task_ID: hex(location) })
+					task_list.append(task_ID)
+					location = location + file_size # Very critical this is updated last.
 
-		# Build a list of Test ID's for user consumption
-		test_list = []
-		for k,v in Game_Test_Data.iteritems():
-			test_list.append(k)
-			
+		pw64_rom.close()
+
 		# For main program help "options"
-		test_list.sort()
-		return ", ".join(test_list)
+		task_list.sort()
+		return ", ".join(task_list)
 
 def game_text_builder():
 	global Game_Text_Data
+	global fs_table
 
-	# Open the ROM, find and process the ADAT chunk @ 0x35C08C
+	# Find our ADAT chunk in the FS
+	for fs_index, fs_attrs in fs_table.items():
+		if fs_attrs[FS_FILE_TYPE] == "ADAT":
+			adat_offset = fs_attrs[FS_FILE_OFFSET]
+
+	# Open the ROM and process the ADAT chunk
 	with open(PW64_Rom, 'rb') as pw64_rom:
-		pw64_rom.seek(int(0x35C08C), 0)
-		
-		FORM_block_marker = pw64_rom.read(4)
+		pw64_rom.seek(int(adat_offset, 16), 0)
+
+		FORM_block_marker = pw64_rom.read(4).decode()
 		FORM_block_length = binascii.b2a_hex(pw64_rom.read(4))
 		
 		# Hardcode skip 0x20 bytes from current position to get to the first NAME:
@@ -252,15 +266,15 @@ def game_text_builder():
 		pw64_rom.seek(0x20, 1)
 		
 		while True:
-			NAME_chunk_marker = pw64_rom.read(4)
+			NAME_chunk_marker = pw64_rom.read(4).decode()
 			NAME_chunk_length = binascii.b2a_hex(pw64_rom.read(4))
 		
 			if NAME_chunk_marker == "NAME":
-				data = pw64_rom.read(int(NAME_chunk_length, 16)).rstrip('\0')
+				data = pw64_rom.read(int(NAME_chunk_length, 16)).decode().rstrip('\0')
 		
-				DATA_chunk_marker = pw64_rom.read(4)
+				DATA_chunk_marker = pw64_rom.read(4).decode()
 				DATA_chunk_length = binascii.b2a_hex(pw64_rom.read(4))
-				data_text = pw64_rom.read(int(DATA_chunk_length, 16))
+				data_text = binascii.b2a_hex(pw64_rom.read(int(DATA_chunk_length, 16))).decode()
 				
 				Game_Text_Data.update({data: data_text})
 		
@@ -363,7 +377,7 @@ def print_adat_decoded(hex_data):
 
 	return adat_final_string
 
-def BALS_parser(BALS_Data, lenght):
+def BALS_parser(BALS_Data, length):
 	# BALS missions: E_RP_1 B_RP_1 P_RP_2 B_RP_3
 	# Still needs further research but is mostly reliable.
 	BALS_Data_Start = BALS_Data.tell()
@@ -376,6 +390,9 @@ def BALS_parser(BALS_Data, lenght):
 	counter = 0
 	for ball in UPWT_BALS_Data:	
 		counter += 1	
+
+		# Convert from bytes to str of hex chars because of python3
+		ball = ball.decode()
 
 		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
 		BALS_x = bytearray.fromhex(''.join(list(grouper(ball, 8, '?'))[0]))
@@ -454,10 +471,12 @@ def BALS_parser(BALS_Data, lenght):
 		print("\t\tScale: %s" % UPWT_BALS_Coordinates_Floats[3])
 
 def BTGT_HOPD_parser(BTGT_HOPD_data, length):
-	# BTGT and HOPD needs verification... seems busted.
+	# BTGT and HOPD needs verification... seems busted. Sample: B_RP_3
 	BTGT_HOPD_Data_Start = BTGT_HOPD_data.tell()
 
 	UPWT_BH_data = binascii.b2a_hex(BTGT_HOPD_data.read(int(length, 16)))
+
+	UPWT_BH_data = UPWT_BH_data.decode()
 	
 	print("\t\tData: ")
 	print("\t\t\tArray Index | Data")
@@ -468,21 +487,13 @@ def BTGT_HOPD_parser(BTGT_HOPD_data, length):
 			
 	BTGT_HOPD_data.seek(BTGT_HOPD_Data_Start, 0) # Go back to start
 
-	# Read the Float coordinates
-	UPWT_BTGT_HOPD_Coordinates = [binascii.b2a_hex(BTGT_HOPD_data.read(4)), # X
-								binascii.b2a_hex(BTGT_HOPD_data.read(4)), # Z
-								binascii.b2a_hex(BTGT_HOPD_data.read(4)), # Y
-								binascii.b2a_hex(BTGT_HOPD_data.read(4)), # Yaw
-								binascii.b2a_hex(BTGT_HOPD_data.read(4)), # Pitch
-								binascii.b2a_hex(BTGT_HOPD_data.read(4))] # Roll
-								
-	#
-	BTGT_HOPD_x = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[0])
-	BTGT_HOPD_z = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[1])
-	BTGT_HOPD_y = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[2])
-	BTGT_HOPD_yaw = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[3])
-	BTGT_HOPD_width = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[4])
-	BTGT_HOPD_height = bytearray.fromhex(UPWT_BTGT_HOPD_Coordinates[5])
+	# Read the Float coordinates and width/heigh of destination cylinder area
+	BTGT_HOPD_x = BTGT_HOPD_data.read(4)		# X
+	BTGT_HOPD_z = BTGT_HOPD_data.read(4)		# Z
+	BTGT_HOPD_y = BTGT_HOPD_data.read(4)		# Y
+	BTGT_HOPD_yaw = BTGT_HOPD_data.read(4)		# Yaw
+	BTGT_HOPD_width = BTGT_HOPD_data.read(4)	# Width
+	BTGT_HOPD_height = BTGT_HOPD_data.read(4)	# Height
 
 	UPWT_BTGT_HOPD_Coordinates_Floats = [round(struct.unpack('>f', BTGT_HOPD_x)[0],6), 
 									round(struct.unpack('>f', BTGT_HOPD_z)[0],6),
@@ -519,7 +530,6 @@ def COMM_parser(COMM_Data, length):
 	# Array/List that will hold COMM data in 4 "hex-byte" chunks
 	COMM_DW_List = []
 
-
 	# Array Index to description "map"
 	array_index_map = { 0: "Pilot Class / Vehicle / Test Number / Level",
 						2: "Weather (Time of Day) / Snow",
@@ -533,7 +543,8 @@ def COMM_parser(COMM_Data, length):
 
 	### Debug
 	# Read in and dump whole COMM into a list 4-bytes at a time
-	UPWT_COMM_data = binascii.b2a_hex(COMM_Data.read(int(length, 16)))
+	UPWT_COMM_data = binascii.b2a_hex(COMM_Data.read(int(length, 16))).decode()
+
 	print("\t\tData: ")
 	print("\t\t\tArray Index | Data         | Data Description")
 	print("\t\t\t---------------------------------------------")
@@ -558,9 +569,10 @@ def COMM_parser(COMM_Data, length):
 
 	# Constant Level Wind Data
 	# 4X == Positive, CX == Negative (West/East, South/North, Up/Down)
-	COMM_WestEast_Wind = round(struct.unpack('>f', COMM_DW_List[4].decode('hex'))[0],6) # +West, -East
-	COMM_SouthNorth_Wind = round(struct.unpack('>f', COMM_DW_List[5].decode('hex'))[0],6) # +South, -North
-	COMM_UpDown = round(struct.unpack('>f', COMM_DW_List[6].decode('hex'))[0],6) # Y-axis lift
+	COMM_WestEast_Wind = round(struct.unpack('>f', bytes.fromhex(COMM_DW_List[4]))[0],6) # +West, -East
+	COMM_SouthNorth_Wind = round(struct.unpack('>f', bytes.fromhex(COMM_DW_List[5]))[0],6) # +South, -North
+	COMM_UpDown = round(struct.unpack('>f', bytes.fromhex(COMM_DW_List[6]))[0],6) # Y-axis lift
+											# Needs to go back to 'b'ytes because we .decode()ed the data before.
 
 	# Counts of Objects / Targets / etc
 	COMM_Object_Thermals = dsplit(COMM_DW_List[263], True)[0]
@@ -638,20 +650,12 @@ def CNTG_parser(CNTG_data, length):
 	CNTG_Data_Start = CNTG_data.tell()
 
 	# Read the Float coordinates
-	UPWT_CNTG_Coordinates = [binascii.b2a_hex(CNTG_data.read(4)), # X
-								binascii.b2a_hex(CNTG_data.read(4)), # Z
-								binascii.b2a_hex(CNTG_data.read(4)), # Y
-								binascii.b2a_hex(CNTG_data.read(4)), # Yaw
-								binascii.b2a_hex(CNTG_data.read(4)), # Pitch
-								binascii.b2a_hex(CNTG_data.read(4))] # Roll
-								
-	#
-	CNTG_x = bytearray.fromhex(UPWT_CNTG_Coordinates[0])
-	CNTG_z = bytearray.fromhex(UPWT_CNTG_Coordinates[1])
-	CNTG_y = bytearray.fromhex(UPWT_CNTG_Coordinates[2])
-	CNTG_yaw = bytearray.fromhex(UPWT_CNTG_Coordinates[3])
-	CNTG_pitch = bytearray.fromhex(UPWT_CNTG_Coordinates[4])
-	CNTG_roll = bytearray.fromhex(UPWT_CNTG_Coordinates[5])
+	CNTG_x = CNTG_data.read(4) 		# X
+	CNTG_z = CNTG_data.read(4)		# Z
+	CNTG_y = CNTG_data.read(4)		# Y
+	CNTG_yaw = CNTG_data.read(4)	# Yaw
+	CNTG_pitch = CNTG_data.read(4)	# Pitch
+	CNTG_roll = CNTG_data.read(4)	# Roll
 
 	UPWT_CNTG_Coordinates_Floats = [round(struct.unpack('>f', CNTG_x)[0],6), 
 									round(struct.unpack('>f', CNTG_z)[0],6),
@@ -677,7 +681,8 @@ def HPAD_parser(HPAD_data, length):
 		UPWT_HPAD_data.append(binascii.b2a_hex(HPAD_data.read(0x40)))
 
 	counter = 0
-	for HPAD in UPWT_HPAD_data:	
+	for HPAD in UPWT_HPAD_data:
+		HPAD = HPAD.decode()
 		counter += 1								 
 		
 		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
@@ -687,6 +692,7 @@ def HPAD_parser(HPAD_data, length):
 		HPAD_yaw = bytearray.fromhex(''.join(list(grouper(HPAD, 8, '?'))[3]))
 		HPAD_pitch = bytearray.fromhex(''.join(list(grouper(HPAD, 8, '?'))[4]))
 		HPAD_roll = bytearray.fromhex(''.join(list(grouper(HPAD, 8, '?'))[5]))
+		HPAD_number = int(''.join(list(grouper(HPAD, 8, '?'))[10]))
 
 		# Round FP precision to 6 digits		
 		UPWT_HPAD_Coordinates_Floats = [round(struct.unpack('>f', HPAD_x)[0],6), 
@@ -702,8 +708,9 @@ def HPAD_parser(HPAD_data, length):
 		for byte_group in ["".join(x) for x in list(grouper(HPAD, 8, '?'))]:
 			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
 			array_index += 1
-				
-		print("\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (UPWT_HPAD_Coordinates_Floats[0],
+
+		print("\t\t\tHPAD Sequence Number: %s\n\t\t\tX: %s\n\t\t\tY: %s\n\t\t\tZ: %s\n\t\t\tYaw: %s\n\t\t\tPitch: %s" % (HPAD_number,
+															UPWT_HPAD_Coordinates_Floats[0],
 															UPWT_HPAD_Coordinates_Floats[2],
 															UPWT_HPAD_Coordinates_Floats[1],
 															UPWT_HPAD_Coordinates_Floats[3],
@@ -719,7 +726,8 @@ def FALC_parser(FALC_data, length):
 		UPWT_FALC_data.append(binascii.b2a_hex(FALC_data.read(0xAC)))
 
 	counter = 0
-	for FALC in UPWT_FALC_data:	
+	for FALC in UPWT_FALC_data:
+		FALC = FALC.decode()
 		counter += 1								 
 		
 		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
@@ -756,20 +764,12 @@ def LPAD_LSTP_TPAD_parser(XPAD_data, length):
 	XPAD_Data_Start = XPAD_data.tell()
 
 	# Read the Float coordinates
-	UPWT_XPAD_Coordinates = [binascii.b2a_hex(XPAD_data.read(4)), # X
-								binascii.b2a_hex(XPAD_data.read(4)), # Z
-								binascii.b2a_hex(XPAD_data.read(4)), # Y
-								binascii.b2a_hex(XPAD_data.read(4)), # Yaw
-								binascii.b2a_hex(XPAD_data.read(4)), # Pitch
-								binascii.b2a_hex(XPAD_data.read(4))] # Roll
-								
-	#
-	XPAD_x = bytearray.fromhex(UPWT_XPAD_Coordinates[0])
-	XPAD_z = bytearray.fromhex(UPWT_XPAD_Coordinates[1])
-	XPAD_y = bytearray.fromhex(UPWT_XPAD_Coordinates[2])
-	XPAD_yaw = bytearray.fromhex(UPWT_XPAD_Coordinates[3])
-	XPAD_pitch = bytearray.fromhex(UPWT_XPAD_Coordinates[4])
-	XPAD_roll = bytearray.fromhex(UPWT_XPAD_Coordinates[5])
+	XPAD_x = XPAD_data.read(4)
+	XPAD_z = XPAD_data.read(4)
+	XPAD_y = XPAD_data.read(4)
+	XPAD_yaw = XPAD_data.read(4)
+	XPAD_pitch = XPAD_data.read(4)
+	XPAD_roll = XPAD_data.read(4)
 
 	UPWT_XPAD_Coordinates_Floats = [round(struct.unpack('>f', XPAD_x)[0],6), 
 									round(struct.unpack('>f', XPAD_z)[0],6),
@@ -799,7 +799,8 @@ def LWIN_parser(LWIN_data, length):
 		UPWT_LWIN_Data.append(binascii.b2a_hex(LWIN_data.read(0x54)))
 
 	counter = 0
-	for wind in UPWT_LWIN_Data:	
+	for wind in UPWT_LWIN_Data:
+		wind = wind.decode()
 		counter += 1
 		print("\t\tLocal Wind # %s:" % counter)
 		print("\t\tLocal Wind Data: ")
@@ -810,13 +811,13 @@ def LWIN_parser(LWIN_data, length):
 			array_index += 1
 
 def JPTX_parser(JPTX_data, length):
-	test_name = JPTX_data.read(int(length, 16)).rstrip('\0')
+	test_name = JPTX_data.read(int(length, 16)).decode().rstrip('\0')
 	
 	# Should probably just do the decoding prior to adding to dict in game_text_builder()?
 	# _N = Name / Title
 	# _M = Message / Mission
-	test_title = "".join(print_adat_decoded(binascii.b2a_hex(Game_Text_Data[str(test_name)+'_N'])))
-	test_mission = print_adat_decoded(binascii.b2a_hex(Game_Text_Data[str(test_name)+'_M'])) 
+	test_title = "".join(print_adat_decoded(Game_Text_Data[test_name+'_N']))
+	test_mission = "".join(print_adat_decoded(Game_Text_Data[test_name+'_M']))
 
 	print("\t\t* Test ID: %s\n" % test_name)
 	print("\t\t* Test Name (%s) and Mission Text / Message (%s):" % (test_name + '_N', test_name + '_M'))
@@ -838,6 +839,7 @@ def PHTS_parser(PHTS_data, length):
 
 	counter = 0
 	for photo in UPWT_PHTS_data:
+		photo = photo.decode()
 		counter += 1
 		print("\t\tPhoto # %s:" % counter)
 		print("\t\t\tArray Index | Data")
@@ -858,30 +860,13 @@ def RNGS_parser(RNGS_data, length):
 
 	counter = 0
 	for ring in UPWT_RNGS_Data:	
-		counter += 1								 
-		
-		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
-		# Last number is "Array Index" seen below in Ring Data. Useful for stuff.
-		RNGS_x = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[0]))
-		RNGS_z = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[1]))
-		RNGS_y = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[2]))
-		RNGS_yaw = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[3]))
-		RNGS_pitch = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[4]))
-		RNGS_roll = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[5]))
-		RNGS_size_state = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[21]))
-		RNGS_motion_rad_start = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[22]))
-		RNGS_motion_rad_end = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[23]))
-		RNGS_motion_axis = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[24]))
-		RNGS_spin_speed = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[25]))
-		RNGS_type = bytearray.fromhex(''.join(list(grouper(ring, 8, '?'))[28]))
+		counter += 1
 
-		# Round FP precision to 6 digits		
-		UPWT_RNGS_Coordinates_Floats = [round(struct.unpack('>f', RNGS_x)[0],6), 
-										round(struct.unpack('>f', RNGS_z)[0],6),
-										round(struct.unpack('>f', RNGS_y)[0],6),
-										round(struct.unpack('>f', RNGS_yaw)[0],6),
-										round(struct.unpack('>f', RNGS_pitch)[0],6)]
-							
+		# Needed for Python3 because we read() in b'ytes' now.
+		ring = ring.decode()
+
+		# Hold our data in 4-byte easy to eat pieces
+		RNGS_stack = []
 
 		print("\t\tRing # %s:" % counter)
 		print("\t\tRing Data: ")
@@ -889,15 +874,36 @@ def RNGS_parser(RNGS_data, length):
 		array_index = 0
 		for byte_group in ["".join(x) for x in list(grouper(ring, 8, '?'))]:
 			print("\t\t\t    (%s)       %s" % (array_index, byte_group))
+			RNGS_stack.append(byte_group)
 			array_index += 1
+
+		# Last number is "Array Index" seen below in Ring Data. Useful for stuff.
+		RNGS_x = RNGS_stack[0]
+		RNGS_z = RNGS_stack[1]
+		RNGS_y = RNGS_stack[2]
+		RNGS_yaw = RNGS_stack[3]
+		RNGS_pitch = RNGS_stack[4]
+		RNGS_roll = RNGS_stack[5]
+		RNGS_size_state = RNGS_stack[21]
+		RNGS_motion_rad_start = RNGS_stack[22]
+		RNGS_motion_rad_end = RNGS_stack[23]
+		RNGS_motion_axis = RNGS_stack[24]
+		RNGS_spin_speed = RNGS_stack[25]
+		RNGS_type = RNGS_stack[28]
+
+		# Round FP precision to 6 digits
+		UPWT_RNGS_Coordinates_Floats = [round(struct.unpack('>f', bytes.fromhex(RNGS_x))[0],6),
+										round(struct.unpack('>f', bytes.fromhex(RNGS_z))[0],6),
+										round(struct.unpack('>f', bytes.fromhex(RNGS_y))[0],6),
+										round(struct.unpack('>f', bytes.fromhex(RNGS_yaw))[0],6),
+										round(struct.unpack('>f', bytes.fromhex(RNGS_pitch))[0],6)]
 
 		### ToDo: More ring parsing:
 		# B_RP_2, 2nd ring is timer, 3rd ring spins on X- axis really fast?
 		# Index [13, 14] has something to do with Timed rings?:
 		#  "rings: Untimed ring index %d in ring %d's timechild list"
 		# Add ring rotation "speed" at 0x8036DC0C, try 00/40
-
-		ring_ss = list(grouper(binascii.b2a_hex(RNGS_size_state), 2, '?'))
+		ring_ss = list(grouper(RNGS_size_state, 2, '?'))
 		ring_size = ''.join(ring_ss[0])
 		ring_state = ''.join(ring_ss[1])
 		print("\t\t\tRing Size (01-04): %s" % ring_size) # 00/05 are invalid: "bad ring size"
@@ -906,7 +912,8 @@ def RNGS_parser(RNGS_data, length):
 		elif ring_state == "01":
 			print("\t\t\tRing State: Active (Open)")
 
-		ring_type = list(grouper(binascii.b2a_hex(RNGS_type), 2, '?'))
+		#ring_type = list(grouper(binascii.b2a_hex(RNGS_type), 2, '?'))
+		ring_type = list(grouper(RNGS_type, 2, '?'))
 		print("\t\t\tRing Details:")
 
 		ring_rotation = ''.join(ring_type[0])
@@ -919,7 +926,7 @@ def RNGS_parser(RNGS_data, length):
 		# (thanks pfedak)
 		#
 		# Motion around axis as seen in B_RP_2 (Ring #10)
-		ring_motion_axis = ''.join(list(grouper(binascii.b2a_hex(RNGS_motion_axis), 2, '?'))[0])
+		ring_motion_axis = ''.join(list(grouper(RNGS_motion_axis, 2, '?'))[0])
 		if ring_motion_axis == "78":
 			print("\t\t\t\tMotion: %s (X-Axis)" % ring_motion_axis)
 		elif ring_motion_axis == "79":
@@ -929,8 +936,8 @@ def RNGS_parser(RNGS_data, length):
 		elif ring_motion_axis == "6e":
 			print("\t\t\t\tMotion: %s (None)" % ring_motion_axis)
 		if ring_motion_axis != "6e":
-			print("\t\t\t\t\tMotion Rad Start: %s" % round(struct.unpack('>f', RNGS_motion_rad_start)[0],6))
-			print("\t\t\t\t\tMotion Rad End: %s" % round(struct.unpack('>f', RNGS_motion_rad_end)[0],6))
+			print("\t\t\t\t\tMotion Rad Start: %s" % round(struct.unpack('>f', bytes.fromhex(RNGS_motion_rad_start))[0],6))
+			print("\t\t\t\t\tMotion Rad End: %s" % round(struct.unpack('>f', bytes.fromhex(RNGS_motion_rad_end))[0],6))
 
 		# Rotation of ring
 		if ring_rotation == "78":
@@ -942,7 +949,7 @@ def RNGS_parser(RNGS_data, length):
 		elif ring_rotation == "6e":
 			print("\t\t\t\tRotation: %s (None)" % ring_rotation) # P_RP_1
 		if ring_rotation != "6e":
-			print("\t\t\t\t\tRotation Speed: %s" % round(struct.unpack('>f', RNGS_spin_speed)[0],6))
+			print("\t\t\t\t\tRotation Speed: %s" % round(struct.unpack('>f', bytes.fromhex(RNGS_spin_speed))[0],6))
 
 		print("\t\t\t\tUnknown1: %s" % ring_unknown1)
 
@@ -964,6 +971,7 @@ def RNGS_parser(RNGS_data, length):
 															UPWT_RNGS_Coordinates_Floats[4]))
 
 def TARG_parser(TARG_data, length):
+	# GC Missile targets, e.g. A_GC_2, B_GC_2, P_GC_2 (Balloon Targets)
 	global COMM_Object_Rocket_Targets
 	TARG_Data_Start = TARG_data.tell()
 
@@ -974,7 +982,9 @@ def TARG_parser(TARG_data, length):
 
 	counter = 0
 	for TARG in UPWT_TARG_data:	
-		counter += 1								 
+		counter += 1
+
+		TARG = TARG.decode()
 		
 		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
 		TARG_x = bytearray.fromhex(''.join(list(grouper(TARG, 8, '?'))[0]))
@@ -983,6 +993,7 @@ def TARG_parser(TARG_data, length):
 		TARG_yaw = bytearray.fromhex(''.join(list(grouper(TARG, 8, '?'))[3]))
 		TARG_pitch = bytearray.fromhex(''.join(list(grouper(TARG, 8, '?'))[4]))
 		TARG_roll = bytearray.fromhex(''.join(list(grouper(TARG, 8, '?'))[5]))
+		TARG_rotation = bytearray.fromhex(''.join(list(grouper(TARG, 8, '?'))[6]))
 
 		# Round FP precision to 6 digits		
 		UPWT_TARG_Coordinates_Floats = [round(struct.unpack('>f', TARG_x)[0],6), 
@@ -990,7 +1001,6 @@ def TARG_parser(TARG_data, length):
 										round(struct.unpack('>f', TARG_y)[0],6),
 										round(struct.unpack('>f', TARG_yaw)[0],6),
 										round(struct.unpack('>f', TARG_pitch)[0],6)]
-									
 
 		print("\t\tTARG # %s:" % counter)
 		print("\t\tTARG Data: ")
@@ -1005,6 +1015,11 @@ def TARG_parser(TARG_data, length):
 															UPWT_TARG_Coordinates_Floats[1],
 															UPWT_TARG_Coordinates_Floats[3],
 															UPWT_TARG_Coordinates_Floats[4]))
+		# 020a0000 = A_GC_2 (Rotating pancake target)
+		# 01030000 = B_GC_2 (Non-rotating pancake target)
+		# 00010000 = P_GC_2 (Spinning Balloon target)
+		if binascii.hexlify(TARG_rotation).decode() == "020a0000":
+			print("\t\t\tTarget Always Faces Player: YES")
 
 def THER_parser(THER_data, length):
 	global COMM_Object_Thermals
@@ -1018,6 +1033,8 @@ def THER_parser(THER_data, length):
 	counter = 0
 	for THER in UPWT_THER_data:	
 		counter += 1								 
+
+		THER = THER.decode()
 
 		# Groups 8 byte blocks, makes into a list, joins tuple, converts to bytearray from hex. disgusting.
 		THER_x = bytearray.fromhex(''.join(list(grouper(THER, 8, '?'))[0]))
@@ -1048,6 +1065,78 @@ def THER_parser(THER_data, length):
 															UPWT_THER_Coordinates_Floats[1],
 															UPWT_THER_Coordinates_Floats[3],
 															UPWT_THER_Coordinates_Floats[4]))
+
+# Reads, unpacks TABL (FS layout)
+def unpack_full_tabl():
+	with open (PW64_Rom, 'rb') as pw64_rom:
+		global fs_table
+		pw64_tabl_mio0_data_start = 0xDE758 # Never changes
+		pw64_fs_start = 0xDF5B0 # Offset of first file in "File System" (UVSY)
+
+		# Get expected MIO0 uncompressed size
+		pw64_rom.seek(int(pw64_tabl_mio0_data_start), 0)
+		pw64_tabl_uncompressed_size = int(binascii.b2a_hex(pw64_rom.read(4)),16)
+
+		# Go back 8 bytes to start of MIO0 compressed TABL data (skip futzing with FORM/GZIP/TABL/etc "chunks")
+		pw64_rom.seek(-8, 1)
+
+		# MIO0 data length == 0xe58 + MIO0 (marker) = 0xe5c
+		# Read in the whole block, decompress MIO0 and convert to hex stream
+		uncompressed_data = decompress_mio0(pw64_rom.read(int(0xe5c))).hex()
+
+		# Build a list of 16-character "groups" which denote "files" (file type + file size)
+		file_count = len(list(grouper(uncompressed_data, 16, '?')))
+
+		fs_index = 0
+		location = pw64_fs_start
+		for filenum in range(0, file_count):
+			# 16-character groups will hold our File Type and File Size to be later translated to Hex.
+			data = ''.join(list(grouper(uncompressed_data, 16, '?'))[filenum])
+
+			# Decoded File Type and File Size for printing
+			file_type = binascii.unhexlify(data[0:8]).decode()
+			file_size = int(data[9:16], 16)
+
+			fs_table.update( {fs_index: [file_type, hex(location), file_size]})
+
+			fs_index += 1
+			location = location + file_size
+
+	pw64_rom.close()
+	return fs_table
+
+# Copied from, and credit to, queueRAM: https://github.com/queueRAM/pilotwings_64/blob/master/pw64_filesys_dump.py
+def decompress_mio0(raw_bytes):
+	magic = raw_bytes[:4]
+	assert magic == b'MIO0'
+
+	uncompressed_size, lengths_offs, data_offs = struct.unpack('>LLL', raw_bytes[4:16])
+	flags_offs = 0x10
+
+	output = b""
+	while True:
+		command_byte = raw_bytes[flags_offs]
+		flags_offs += 1
+
+		for i in reversed(range(8)):
+			if command_byte & (1 << i):
+				# Literal
+				uncompressed_size -= 1
+				output += bytes([raw_bytes[data_offs]])
+				data_offs += 1
+			else:
+				# LZSS
+				tmp, = struct.unpack('>H', raw_bytes[lengths_offs:lengths_offs+2])
+				lengths_offs += 2
+
+				window_offset = (tmp & 0x0FFF) + 1
+				window_length = (tmp >> 12) + 3
+				uncompressed_size -= window_length
+				for j in range(window_length):
+					output += bytes([output[-window_offset]])
+
+			if uncompressed_size <= 0:
+				return output
 
 if __name__== "__main__":
   main()
