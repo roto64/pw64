@@ -384,6 +384,7 @@ def read_comm_from_rom(test_ID):
     return comm_data
 
 def write_final_upwt(modified_upwt_data, output_rom):
+    global COMM_data_start
     # This overwrites the given Task ID's COMM section in ROM
     with open(output_rom, 'r+b') as pw64_rom:
         pw64_rom.seek(COMM_data_start, 0) # Go to start of COMM data for given test_ID

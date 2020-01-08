@@ -17,7 +17,7 @@
 # Needs more research as data doesn't make sense: CNTG / FALC / HOPD / HPAD / LWND / PHTS
 
 # ToDo:
-# Add JSON output/dump
+# Add JSON dumps of the rest of the objects. Right now only COMM/RNGS/BALS/LSTP/TPAD are exported.
 # ArgParse for flags (such as JSON output above)
 
 # ToDo Later:
@@ -29,6 +29,8 @@ import struct
 import sys
 
 import pw64_lib
+
+DUMP_JSON = False # Write out a <TASK_ID>.json file?
 
 # Global variables shared between some functions
 COMM_Object_Thermals = 0
@@ -78,6 +80,8 @@ def main():
 	if len(sys.argv) < 2:
 		print("Please provide a Test ID!\n")
 		print("Here's some options:\n\n%s" % tests_list)
+		print("\nAnd here is the list in the FS:\n")
+		pw64_lib.show_fs_table("UPWT")
 		sys.exit(1)
 	else:
 		Test_ID = sys.argv[1]
@@ -175,10 +179,11 @@ def main():
 				#print("*** %s" % hex(pw64_rom.tell()))
 				pw64_rom.close()
 
-				# dump our JSON and bail out
-				with open(Test_ID + ".json", "w") as json_out:
-					json.dump(upwt_task_json, json_out, indent=2)
-				print(json.dumps(upwt_task_json))
+				if DUMP_JSON:
+					# dump our JSON and bail out
+					with open(Test_ID + ".json", "w") as json_out:
+						json.dump(upwt_task_json, json_out, indent=2)
+					print(json.dumps(upwt_task_json))
 				sys.exit(0)
 
 def mission_index_builder():
