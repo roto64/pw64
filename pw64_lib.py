@@ -1,5 +1,6 @@
 import binascii
 import itertools
+import os
 import struct
 from subprocess import call
 
@@ -321,26 +322,48 @@ def float_to_hex(float_in):
     return struct.pack('>f', float_in)
 
 # Combined unpack_tabl and build_fs_map
-def build_fs_table(PW64_Rom):
+# We can specify a game here because we can now parse AeroFighters Assault! Defaults to PW64.
+def build_fs_table(ROM, game="PW64"):
     global fs_table
     global pw64_tabl_uncompressed_size
 
     fs_table.clear()
 
-    with open (PW64_Rom, 'rb') as pw64_rom:
-        pw64_tabl_mio0_data_start = 0xDE758 # Never changes
-        pw64_fs_start = 0xDF5B0 # Offset of first file in "File System" (UVSY)
+    with open (ROM, 'rb') as pw64_rom:
+        # AeroFighters Assault is also made by Paradigm Entertainment (previously part of Paradigm Simulation).
+        # Has a similar TABL chunk we can process, if so inclined... example:
+        #   !/usr/bin/env python3
+        #   import pw64_lib
+        #   def main():
+        #       ROM = "<AFA_ROM>"
+        #       pw64_lib.fs_table = pw64_lib.build_fs_table(ROM, "AFA")
+        #       pw64_lib.show_fs_table() # or e.g. ("UVMD")
+        #   if __name__== "__main__":
+        #   main()
+        if game == "AFA":
+            tabl_form_start = 0x118690
+            afa_tabl_mio0_data_start = 0x1186C8 # Never changes
+            afa_fs_start = 0x119530 # Offset of first file in "File System" (UVSY)
+            pw64_tabl_mio0_data_start = afa_tabl_mio0_data_start
+            pw64_fs_start = afa_fs_start
+        elif game == "PW64":
+            tabl_form_start = 0xDE720
+            pw64_tabl_mio0_data_start = 0xDE758 # Never changes
+            pw64_fs_start = 0xDF5B0 # Offset of first file in "File System" (UVSY)
+
+        # Get MIO0 Data chunk size
+        pw64_rom.seek(tabl_form_start + 0x28, 0) # Move 0x28 forward to skip other markers/etc
+        mio0_data_chunk_size = pw64_rom.read(4)
 
         # Get expected MIO0 uncompressed size
-        pw64_rom.seek(int(pw64_tabl_mio0_data_start), 0)
+        pw64_rom.seek(tabl_form_start + 0x38, 0) # MIO0 data starts at FORM + 0x38
         pw64_tabl_uncompressed_size = int(binascii.b2a_hex(pw64_rom.read(4)),16)
 
         # Go back 8 bytes to start of MIO0 compressed TABL data (skip futzing with FORM/GZIP/TABL/etc "chunks")
         pw64_rom.seek(-8, 1)
 
-        # MIO0 data length == 0xe58 + MIO0 (marker) = 0xe5c
         # Read in the whole block, decompress MIO0 and convert to hex stream
-        uncompressed_data = decompress_mio0(pw64_rom.read(int(0xe5c))).hex()
+        uncompressed_data = decompress_mio0(pw64_rom.read(int.from_bytes(mio0_data_chunk_size, 'big'))).hex()
 
         # Build a list of 16-character "groups" which denote "files" (file type + file size)
         file_count = len(list(grouper(uncompressed_data, 16, '?')))
@@ -421,11 +444,17 @@ def read_comm_from_rom(test_ID, rom_file):
     return comm_data, COMM_data_start
 
 # Write new size for UPWT task to the FS table for later TABL build and compression
+# TODO: Rewrite this to be "update file size" for all files
 def update_task_size_in_tabl(task_id, new_size):
     for file_index in fs_table:
         if fs_table[file_index][FS_FILE_UPWT_TASK_ID] == task_id:
             print("Task Name: %s (FS ID: %s) resized to: %s" % (task_id, file_index, new_size))
             fs_table[file_index][FS_FILE_SIZE] = new_size
+
+# See above... don't do this.
+def update_file_size_in_tabl(file_index, new_size):
+    print("File ID: %s resized to: %s" % (file_index, new_size))
+    fs_table[file_index][FS_FILE_SIZE] = new_size
 
 # Test ID -> FS Index
 def get_fs_index_and_size_of_task(task_name):
@@ -466,7 +495,104 @@ def update_upwt_size(upwt_addr, new_size, output_rom):
         pw64_rom.write(new_size.to_bytes(2, 'big'))
     pw64_rom.close()
 
+# ^ and \/ -- basically identical? merge+rewrite
+
+def overwrite_in_rom(output_rom, offset, data):
+    # Overwrites data without adding anything (no need to update TABL)
+
+    with open(output_rom, 'r+b') as pw64_rom:
+        pw64_rom.seek(offset)
+        pw64_rom.write(bytes.fromhex(data))
+    pw64_rom.close()
+
 # Inject data into offset
 def inject_data(offset, data, trim_rom=True):
     # TODO: Things
+    # use write_final_upwt() from JSON PoC for base
     pass
+
+def rebuild_TABL():
+# Once we've done our mods and modified the TABL data (i.e. UPWT "file" size),
+# rebuild and write out the entire TABL back to binary format for later MIO0 compression
+# Note: 'filesys' size Debug output is at 0x802C1C34
+#       0x802B6CC8 = E_GC_1's size as read from TABL
+    with open("TABL_NEW.bin", 'wb') as TABL_OUT:
+        for f in range(len(fs_table)):
+            file_type = fs_table[f][FS_FILE_TYPE].encode()
+            file_size = binascii.unhexlify(hex(fs_table[f][FS_FILE_SIZE]).lstrip("0x").zfill(8).encode()) # HAHA WAT
+
+            TABL_OUT.write(file_type)
+            TABL_OUT.write(file_size)
+    TABL_OUT.close()
+
+    # Use the external 'mio0' tool to re-compress this data.
+    # If I had a Python sample of MIO0 compression code this would not be needed...
+    call(['./mio0', 'TABL_NEW.bin', 'TABL_NEW.mio0'])
+
+    print("* TABL updated, rebuilt, written out to tempfile, MIO0 re-compressed.")
+
+def inject_TABL(rom):
+    # This goes hand-in-hand with rebuild_TABL()... should probably be combined into one function.
+    # Take our newly built and compressed TABL and shove it back into the ROM.
+    # Make sure the MIO0 is padded. For some reason the `mio0` tool doesn't re-compress to original size? I don't know how these things work.
+    # To be more clear the MIO0 data in the PW64 ROM is 3676 bytes but after all the
+    # other work is done it compresses back to only 3409 bytes.
+    mio0_file_size = os.path.getsize('TABL_NEW.mio0')
+    if mio0_file_size < 3676:
+        bytes_to_pad = 3676 - mio0_file_size
+        with open ("TABL_NEW.mio0", 'ab') as m: # Open the ROM in append mode.
+            m.write(binascii.unhexlify('00')*bytes_to_pad) # Seems to work fine? :shrug:
+        m.close()
+
+    # Get the rom size. We will add/remove these padding bytes here as needed when we start to inject bigger UPWTasks.
+    #rom_file_size = os.path.getsize(PW64_ROM)
+
+    # Write our newly compressed MIO0 TABL data back into the ROM.
+    with open (rom, 'r+b') as pw64_rom: #F'ing was using the wrong mode (wb) and it was zeroing all data
+        pw64_rom.seek(int(0xDE754), 0)
+        with open ("TABL_NEW.mio0", 'rb') as mio0:
+            pw64_rom.write(mio0.read()) # File read/write inception.
+        mio0.close()
+    pw64_rom.close()
+
+    # Remove the files (or comment out for debugging... but why? it works! trust me!)
+    os.remove("TABL_NEW.bin")
+    os.remove("TABL_NEW.mio0")
+
+    print("* New TABL chunk injected into ROM.")
+
+def inject_data_into_rom(rom, data, addr):
+    # We open the ROM in read-only mode, read in the original data from the ROM up to where we want to insert our new data.
+    # Open a temp file in write mode, read the ROM up to the insertion address and then insert the BALS bytes we read in previously.
+    # Then read in (from old ROM) and write (to temp file) the rest of the ROM.
+    # This is a form of "injecting" data into a binary file. Python doesn't have an "insert" mode for writing files...
+    # When done writing out this newly munged crap into a temp file, remove the original and rename our temp file back to the OG ROM name.
+    # There's probably a better way to do this.
+
+    rom_size_expected = 8388608
+
+    with open(rom, 'rb') as pw64_rom_first, open("PW64_ROM_TMP.z64", 'wb') as pw64_rom_second:
+        pw64_rom_second.write(pw64_rom_first.read(addr)) # Read all the bytes up to where we need to insert our data
+        pw64_rom_second.write(data) # Add our newly recompiled UPWT container
+
+        pw64_rom_second.write(pw64_rom_first.read()) # Read in the rest of the data from original ROM and write to temp file
+
+        #fs_size_change = len(final_upwt_data) - old_upwt_size
+        #if fs_size_change > 0:
+        #    pw64_rom_second.flush()
+        #    pw64_rom_second.seek(-fs_size_change, os.SEEK_END)
+        #    pw64_rom_second.truncate()
+        pw64_rom_second.seek(os.SEEK_END, 1)
+        rom_end = pw64_rom_second.tell()
+
+        if rom_size_expected < rom_end:
+            pw64_rom_second.flush()
+            pw64_rom_second.seek(rom_size_expected, 0)
+            pw64_rom_second.truncate()
+
+    pw64_rom_second.close()
+    pw64_rom_first.close()
+
+    # Switch our files ... ooh scary.
+    os.remove(rom)
+    os.rename('PW64_ROM_TMP.z64', rom)

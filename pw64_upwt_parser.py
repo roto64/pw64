@@ -30,7 +30,7 @@ import sys
 
 import pw64_lib
 
-DUMP_JSON = False # Write out a <TASK_ID>.json file?
+DUMP_JSON = True # Write out a <TASK_ID>.json file?
 
 # Global variables shared between some functions
 COMM_Object_Thermals = 0
@@ -70,12 +70,21 @@ def main():
 	# Unpack and decode the FS
 	pw64_lib.fs_table = pw64_lib.build_fs_table(PW64_Rom)
 
+	# Print full FS Table
+	if len(sys.argv) == 2 and sys.argv[1] == "-l":
+		pw64_lib.show_fs_table()
+		sys.exit(0)
+	# Print list of specified file type
+	elif len(sys.argv) == 3 and sys.argv[1] == "-l":
+		pw64_lib.show_fs_table(sys.argv[2].upper())
+		sys.exit(0)
+
 	# Read the ADAT chunk from the ROM and store in a global dict
 	game_text_builder()
 
 	# Build the list of available Test IDs and populate "Game_Test_Data"
 	tests_list = mission_index_builder()
-	
+
 	# Did we get a Test ID?
 	if len(sys.argv) < 2:
 		print("Please provide a Test ID!\n")

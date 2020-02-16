@@ -57,10 +57,10 @@ def main():
     pw64_lib.update_task_size_in_tabl(test_id, new_upwt_size)
 
     # Does what it says.
-    rebuild_TABL()
+    pw64_lib.rebuild_TABL()
 
     # Inject our updated and compressed TABL back into the ROM.
-    inject_TABL()
+    pw64_lib.inject_TABL(PW64_ROM)
 
     ###
     # See FIXME above. Doing this *after* rebuilding/injecting the TABL seems to not blow anything up...
@@ -483,51 +483,6 @@ def change_some_text(test_id):
         data = pw64_lib.encode_adat("Fly through 3 rings and...\nooh look a balloon!", 0x70)
         pw64_rom.write(data)
     pw64_rom.close()
-
-def rebuild_TABL():
-# Once we've done our mods and modified the TABL data (i.e. UPWT "file" size),
-# rebuild and write out the entire TABL back to binary format for later MIO0 compression
-# Note: 'filesys' size Debug output is at 0x802C1C34
-#       0x802B6CC8 = E_GC_1's size as read from TABL
-    with open("TABL_NEW.bin", 'wb') as TABL_OUT:
-        for f in range(len(pw64_lib.fs_table)):
-            file_type = pw64_lib.fs_table[f][pw64_lib.FS_FILE_TYPE].encode()
-            file_size = binascii.unhexlify(hex(pw64_lib.fs_table[f][pw64_lib.FS_FILE_SIZE]).lstrip("0x").zfill(8).encode()) # HAHA WAT
-
-            TABL_OUT.write(file_type)
-            TABL_OUT.write(file_size)
-    TABL_OUT.close()
-
-    # Use the external 'mio0' tool to re-compress this data.
-    # If I had a Python sample of MIO0 compression code this would not be needed...
-    call(['./mio0', 'TABL_NEW.bin', 'TABL_NEW.mio0'])
-
-    print("* TABL updated, rebuilt, written out to tempfile, MIO0 re-compressed.")
-
-def inject_TABL():
-    # Take our newly built and compressed TABL and shove it back into the ROM.
-    # Make sure the MIO0 is padded. For some reason the `mio0` tool doesn't re-compress to original size? I don't know how these things work.
-    # To be more clear the MIO0 data in the PW64 ROM is 3676 bytes but after all the
-    # other work is done it compresses back to only 3409 bytes.
-    mio0_file_size = os.path.getsize('TABL_NEW.mio0')
-    if mio0_file_size < 3676:
-        bytes_to_pad = 3676 - mio0_file_size
-        with open ("TABL_NEW.mio0", 'ab') as m: # Open the ROM in append mode.
-            m.write(binascii.unhexlify('00')*bytes_to_pad) # Seems to work fine? :shrug:
-        m.close()
-
-    # Get the rom size. We will add/remove these padding bytes here as needed when we start to inject bigger UPWTasks.
-    #rom_file_size = os.path.getsize(PW64_ROM)
-
-    # Write our newly compressed MIO0 TABL data back into the ROM.
-    with open (PW64_ROM, 'r+b') as pw64_rom: #F'ing was using the wrong mode (wb) and it was zeroing all data
-        pw64_rom.seek(int(0xDE754), 0)
-        with open ("TABL_NEW.mio0", 'rb') as mio0:
-            pw64_rom.write(mio0.read()) # File read/write inception.
-        mio0.close()
-    pw64_rom.close()
-
-    print("* New TABL chunk injected into ROM.")
 
 if __name__== "__main__":
   main()
