@@ -543,6 +543,10 @@ Data that is not yet decoded or requires more processing, such as with a lookup 
 Here's what the above JSON looks like once parsed, processed and injected back into the ROM:
 ![Test select map preview](https://i.imgur.com/ZpsK7hj.png) ![In-game view of the 5 rings and 2 balloons](https://i.imgur.com/WkenGIs.png)
 
+And finally here's a video of this in action:
+
+[![Mod#5 video](https://img.youtube.com/vi/YK3L8eoG3ts/0.jpg)](https://www.youtube.com/watch?v=YK3L8eoG3ts)
+
 You can see there's now 5 rings instead of 3 and two balloons atop the castle in the Beginner GyroCopter test/mission.
 
 ## Q&A
