@@ -18,6 +18,8 @@ adat_layout = {}
 pw64_tabl_uncompressed_size = 0
 COMM_data_start = 0
 
+rom_size_expected = 8388608
+
 # COMM Data and Offsets. There's quite a lot of COMM data that varies between tasks but these are the ones I was able to decipher for now.
 COMM_layout = {
     "pilot_class" : 0x0, # Test Class # '00': 'Beginner', '01': 'Class A', '02': 'Class B', '03': 'Pilot Class'
@@ -67,7 +69,7 @@ RNGS_layout = {
     "next_ring_index": [0x20, 0x24, 0x28, 0x2c]
 }
 
-TPAD_layout = {
+LPAD_layout = {
     "x": 0x0,
     "y": 0x4,
     "z": 0x8,
@@ -83,6 +85,16 @@ LSTP_layout = {
     "yaw": 0xc,
     "pitch": 0x10,
     "roll": 0x14
+}
+
+TPAD_layout = {
+    "x": 0x0,
+    "y": 0x4,
+    "z": 0x8,
+    "yaw": 0xc,
+    "pitch": 0x10,
+    "roll": 0x14,
+    "vehicle_fuel": 0x2c
 }
 
 BALS_layout = {
@@ -483,9 +495,15 @@ def patch_fs_addrs(patch_size, rom_file):
         for addr in fs_size_mod_locs:
             pw64_rom.seek(addr, 0)
             data = int(binascii.hexlify(pw64_rom.read(2)), 16) + patch_size # Read the bytes and convert to int + increase size
+            print(hex(data))
+            # In case we're making something smaller than the old thing.
+            if data < 0:
+                data = abs(data)
+            print(hex(data))
             pw64_rom.seek(addr, 0)
             #pw64_rom.write(binascii.unhexlify(hex(data).lstrip('0x'))) # stupid bytes() function doesn't do what I expected.
-            pw64_rom.write(binascii.unhexlify(b'%x' % (data))) # This is still silly but better than ^
+            #pw64_rom.write(binascii.unhexlify(b'%x' % (data))) # This is still silly but better than ^
+            pw64_rom.write(binascii.unhexlify(format(data, '04x'))) # Leading zero padding in case of negative calculation
     pw64_rom.close()
 
 def update_upwt_size(upwt_addr, new_size, output_rom):
@@ -562,15 +580,13 @@ def inject_TABL(rom):
     print("* New TABL chunk injected into ROM.")
 
 def inject_data_into_rom(rom, data, addr):
+    # This only SHIFTS data (does not work for swapping files)
     # We open the ROM in read-only mode, read in the original data from the ROM up to where we want to insert our new data.
     # Open a temp file in write mode, read the ROM up to the insertion address and then insert the BALS bytes we read in previously.
     # Then read in (from old ROM) and write (to temp file) the rest of the ROM.
     # This is a form of "injecting" data into a binary file. Python doesn't have an "insert" mode for writing files...
     # When done writing out this newly munged crap into a temp file, remove the original and rename our temp file back to the OG ROM name.
     # There's probably a better way to do this.
-
-    rom_size_expected = 8388608
-
     with open(rom, 'rb') as pw64_rom_first, open("PW64_ROM_TMP.z64", 'wb') as pw64_rom_second:
         pw64_rom_second.write(pw64_rom_first.read(addr)) # Read all the bytes up to where we need to insert our data
         pw64_rom_second.write(data) # Add our newly recompiled UPWT container
@@ -596,3 +612,18 @@ def inject_data_into_rom(rom, data, addr):
     # Switch our files ... ooh scary.
     os.remove(rom)
     os.rename('PW64_ROM_TMP.z64', rom)
+
+# This could probably be done with the above func
+def pad_rom(rom):
+    rom_size = os.path.getsize(rom)
+
+    if rom_size < rom_size_expected:
+        with open(rom, 'ab') as pw64_rom:
+            pw64_rom.seek(os.SEEK_END, 0)
+            pw64_rom.write(binascii.unhexlify('FF')*(rom_size_expected-rom_size))
+        pw64_rom.close()
+    elif rom_size > rom_size_expected:
+        with open(rom, 'r+b') as pw64_rom: # 'wb' will write all 0's to the ROM.
+            pw64_rom.seek(rom_size_expected, 0)
+            pw64_rom.truncate()
+        pw64_rom.close()

@@ -381,8 +381,9 @@ def BALS_parser(BALS_Data, length):
 			print("\t\tBall / Balloon Type: Splits into 5 Orange Balloons(%s)" % BALS_type)
 
 		# Can't be popped
+		# Note: No combination of solidity/weight/etc allows Gyro to blow up balloon with rocket.
 		if BALS_solidity == '43fa0000':
-			print("\t\tBall / Balloon Can Pop: NO") # B_RP_3
+			print("\t\tBall / Balloon Can Pop: NO") # B_RP_3 / P_RP_2
 		else:
 			print("\t\tBall / Balloon Can Pop: YES")
 		# /\ --- \/ wait wat? Double check these two...
@@ -625,7 +626,7 @@ def CNTG_parser(CNTG_data, length):
 									round(struct.unpack('>f', CNTG_pitch)[0],6),
 									round(struct.unpack('>f', CNTG_roll)[0],6)]
 
-	print("\t\tX: %s\n\t\tY: %s\n\t\tZ: %s\n\t\tYaw: %s\n\t\tPitch: %s\n\t\tRoll: %s" % (UPWT_CNTG_Coordinates_Floats[0],
+	print("\t\tX: %s\n\t\tY: %s\n\t\tZ: %s\n\t\tYaw: %s\n\t\tPitch: %s\n\t\tVehicle Fuel: %s" % (UPWT_CNTG_Coordinates_Floats[0],
 														UPWT_CNTG_Coordinates_Floats[2],
 														UPWT_CNTG_Coordinates_Floats[1],
 														UPWT_CNTG_Coordinates_Floats[3],
@@ -734,6 +735,10 @@ def LPAD_LSTP_TPAD_parser(XPAD_data, marker_type, length):
 	XPAD_pitch = XPAD_data.read(4)
 	XPAD_roll = XPAD_data.read(4)
 
+	# Vehicle Fuel Level on task start
+	XPAD_data.seek(0x14, 1)
+	TPAD_fuel = struct.unpack('>f',XPAD_data.read(4))[0]
+
 	UPWT_XPAD_Coordinates_Floats = [round(struct.unpack('>f', XPAD_x)[0],6), 
 									round(struct.unpack('>f', XPAD_z)[0],6),
 									round(struct.unpack('>f', XPAD_y)[0],6),
@@ -748,6 +753,9 @@ def LPAD_LSTP_TPAD_parser(XPAD_data, marker_type, length):
 														UPWT_XPAD_Coordinates_Floats[4],
 														UPWT_XPAD_Coordinates_Floats[5]))
 
+	if marker_type == "TPAD":
+		print("\t\tVehicle Fuel Load: " + "{:.2%}".format(TPAD_fuel))
+
 	# Temporary way to populate the JSON data for a quick test
 	if marker_type == "TPAD" and upwt_task_json['COMM']['TPAD'] == 1:
 		upwt_task_json['TPAD'] = {} # Add another nested dict
@@ -757,6 +765,7 @@ def LPAD_LSTP_TPAD_parser(XPAD_data, marker_type, length):
 		upwt_task_json['TPAD']['yaw'] = UPWT_XPAD_Coordinates_Floats[3]
 		upwt_task_json['TPAD']['pitch'] = UPWT_XPAD_Coordinates_Floats[4]
 		upwt_task_json['TPAD']['roll'] = UPWT_XPAD_Coordinates_Floats[5]
+		upwt_task_json['TPAD']['vehicle_fuel'] = TPAD_fuel
 
 	if marker_type == "LSTP" and upwt_task_json['COMM']['LSTP'] == 1:
 		upwt_task_json['LSTP'] = {}

@@ -81,6 +81,8 @@ def main():
 
     pw64_lib.show_fs_table("UPWT") # Show the listing of UPWT's at the end for whatever reason
 
+    print("Done: If your ROM diff does not match what you expect, make sure your E_GC_1.json is correct.")
+
 def modify_upwt(test_id):
 
     # Read in the base (unmodified) COMM chunk and also address/offset of said  chunk
@@ -118,6 +120,9 @@ def modify_upwt(test_id):
     return final_upwt_size
 
 def assemble_final_upwt(filename, modified_comm_data):
+    ###
+    # Chunks that can vary in size should not use these static headers (e.g. BALS/RNGS)
+    ###
     # TPAD is 0x30 bytes + Marker (0x4) + Size (0x4)
     # From: E_GC_1
     TPAD_header = bytes.fromhex('5450414400000030')
@@ -351,6 +356,9 @@ def rebuild_upwt_chunk(filename, chunk):
         upwt_io.write(pw64_lib.float_to_hex(decoded_data[chunk]["roll"]))
         upwt_io.seek(XPAD_layout["pitch"], 0)
         upwt_io.write(pw64_lib.float_to_hex(decoded_data[chunk]["pitch"]))
+        if chunk == "TPAD":
+            upwt_io.seek(XPAD_layout["vehicle_fuel"], 0)
+            upwt_io.write(pw64_lib.float_to_hex(decoded_data[chunk]["vehicle_fuel"]))
 
     # If we reach here, we return one of the singular objects like TakeOff Pad or Landing Strip.
     upwt_io.seek(0)
