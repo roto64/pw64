@@ -13,12 +13,12 @@ function build_all () {
   # This builds us a ROM with some code injected. See pw64.asm.
       
   # Your path where your n64chain (https://github.com/tj90241/n64chain)  stuff lives
-  BUILD_TOOLS_PATH="~/sm64tools/"
+  BUILD_TOOLS_PATH="/code/"
 
   # Limit our paths to MIPS/N64 tools only.
   # Otherwise we have conflicts with GCC dev tools like 'as' in default $PATH
   # Store your n64 toolchain binaries somewhere in these paths or fix this mess yourself (sry).
-  export PATH="$BUILD_TOOLS_PATH/n64chain:$BUILD_TOOLS_PATH/mips64-elf/bin"
+  export PATH="$BUILD_TOOLS_PATH/n64_bin:$BUILD_TOOLS_PATH/mips64-elf/bin"
 
   # Build it.
   mips64-elf-gcc -Wall -O3 -mtune=vr4300 -march=vr4300 -mabi=32 -fomit-frame-pointer -G0 -c injection_test.c -o injection_test.o

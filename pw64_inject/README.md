@@ -1,16 +1,12 @@
 Testing some SM64-style (https://github.com/shygoo/sm64-c-injection) code injection.
 
 Contains two directories:
-asm
-c
-
-Obviously depending on the dir this repo has examples of the same thing but with different methods.
-
-What it does:
-Overwrites some code that runs during the intro animation sequence to instead load code from ROM (stored in padding bytes section) to RAM and then jump to that code.
-
-What its supposed to show:
-The code we load will then show a black screen with some text while music plays in the background (because we never exited the Intro scene cleanly). That's it (for now)!
+* asm:
+    - a simple armips example to show a message on the start screen.
+* c:
+    - injection_test: same as ASM example above but now in C
+    - intro_banner: prints some text above the PW64 logo on the start screen
+    - vehicle_coordinates: prints player's world X/Y/Z coordinates in-game
 
 
 Tools you need:
