@@ -20,6 +20,9 @@ function build_all () {
   # Store your n64 toolchain binaries somewhere in these paths or fix this mess yourself (sry).
   export PATH="$BUILD_TOOLS_PATH/n64_bin:$BUILD_TOOLS_PATH/mips64-elf/bin"
 
+  # The "hook" which will check if our code is loaded and run it, or bail.
+  mips64-elf-gcc -Wall -O3 -mtune=vr4300 -march=vr4300 -mabi=32 -fomit-frame-pointer -G0 -c hook.c -o hook.o
+
   # Build it.
   mips64-elf-gcc -Wall -O3 -mtune=vr4300 -march=vr4300 -mabi=32 -fomit-frame-pointer -G0 -c injection_test.c -o injection_test.o
 
@@ -40,7 +43,7 @@ function build_all () {
 function clean_all () {
   # This is what you get for messing with $PATH.
   export PATH=$OLD_PATH
-  rm injection_test.bin injection_test.o
+  rm injection_test.bin injection_test.o hook.o
 }
 
 function fix_rom_cksum () {

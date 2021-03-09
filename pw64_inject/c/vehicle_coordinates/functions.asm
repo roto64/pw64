@@ -19,3 +19,4 @@
 .definelabel vehicleY, 0x80362790
 .definelabel vehicleZ, 0x8036278C
 .definelabel demoControllerShowToggle, 0x8031EABC
+.definelabel ourcode, 0x8038CCC8

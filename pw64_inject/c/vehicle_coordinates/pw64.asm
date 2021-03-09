@@ -40,17 +40,17 @@ jal demoControllerShowToggle ; Uhh... a hack because I couldn't quickly find a b
                              ; Set this bit to 1 (on) and we'll trigger our function to print stuff.
 li a0, 0x1 ; Yes, "show the contoller" as if we're in demo flight mode.
 
-; Move to the part of the code that checks if a bit is set to 1 (such as during demo-flight).
-; Replace that part of code to instead run our injected code.
-.orga 0x9FBE8 ; Offset in ROM for "demo controller show/check" (func @ 0x803186B8)
-jal runonce
-nop
+; Go to the function that draws the on-screen demo controller and fully overwrite it.
+; Here we load our "hook" code that will run continuously and decide whether to
+; display stuff on screen or not depending on the code above (that loads our ROM code into RAM).
+.orga 0xA3404 ; Offset in ROM for start of demoControllerShow() (func @ 0x8031BED4)
+.importobj "hook.o"
 
 ; This section will "inject" our compiled C code in the Padding section of the ROM @ 0x700000
 .headersize 0x7FC8CCC8 ; The "headersize" is calculated as such:
                        ; 0x8038CCC8 (Our code in RAM) - 0x700000 (code in ROM) = 0x7FC8CCC8
 
-.orga 0x700000 ; Where our code will be stored in ROM (in the padding bytes, lots of room)
+.orga 0x700000 ; Where our code will be stored in ROM
 runonce:
 .importobj "injection_test.o" ; armips just sucks in the binary code, no headers. awesome.
 .Close

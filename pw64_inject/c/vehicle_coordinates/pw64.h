@@ -15,3 +15,6 @@ extern void demoControllerShowToggle(int toggle); // On-screen N64 controller sh
 extern float vehicleX;
 extern float vehicleY;
 extern float vehicleZ;
+extern void hud_inject ();
+extern void uvDMA( int dst, int src, int len );
+extern int ourcode; // Nasty hack but if it's a 0, we haven't injected our code properly.
