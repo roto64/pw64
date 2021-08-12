@@ -68,7 +68,7 @@ target_new = b'\xD4\xD0'
 # Number of bytes to move over (depends on size of bytes to seek)
 num_byte = 2
 
-PW64_ROM = "Pilotwings 64 (U) [!].z64.bak" # PW64_MOD_EDITOR.z64
+PW64_ROM = "PW64_MOD_EDITOR.z64"
 
 with open (PW64_ROM, "r+b") as pw64_rom:
 	data = pw64_rom.read()
